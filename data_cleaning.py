@@ -5,22 +5,25 @@ import matplotlib.pyplot as plt
 from scipy import stats
 from scipy.stats import norm
 
-file_path = 'C:/Users/elain/OneDrive/Documents/Research - BATS/matched_data_closest.xlsx'
+file_path = 'C:/Users/elain/OneDrive/Documents/Research - BATS/matched_data_from_BATS.xlsx'
 df = pd.read_excel(file_path)
 df = df.apply(pd.to_numeric, errors='coerce').astype('float64')
-df['yymmdd'] = pd.to_datetime(df['yymmdd'], format='%Y%m%d') 
+df['yymmdd'] = pd.to_datetime(df['yymmdd_in'], format='%Y%m%d') 
 df['day_of_year'] = df['yymmdd'].dt.dayofyear
-df['PP'] = df['PP'] * 12 #converting from mmolC to mgC
+df['PP'] = df['pp'] * 12 #converting from mmolC to mgC
+df['TON'] = df['TN']
+df['TOP'] = df['TDP']
+df['BAC'] = df['Bact']
 print("Number of rows in original dataset:", len(df))
 
-df = df[["yymmdd", "day_of_year", "Depth", "Chl", "Temp", "O2", "NO3", "PO4", "POC", "PON", "TOP", "BAC", "PP"]]
+df = df[["yymmdd", "day_of_year", "Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "TOP", "BAC", "PP"]]
 #df = df.dropna() #drop NaNs
-print("Number of rows after dropping NaNs:", len(df))
+#print("Number of rows after dropping NaNs:", len(df))
 df = df.drop_duplicates(subset=['yymmdd', 'Depth'], keep='first') #drop duplicates
 print("Number of rows after dropping duplicates:", len(df))
 
-arr_names = ["day_of_year", "Depth", "Chl", "Temp", "O2", "NO3", "PO4", "POC", "PON", "TOP", "BAC", "PP"]
-arr_units = ["", " (m)", " (mg/m3)", " (C)", " (umol/kg)", " (umol/kg)", " (ug/kg)", " (ug/kg)", " (umol/kg)", " (umol/kg)", " (cells*10^8/kg)", " (mgC/m³/day)"]
+arr_names = ["day_of_year", "Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "TOP", "BAC", "PP"]
+arr_units = ["", " (m)", " (mg/m3)", " (C)", " (umol/kg)", " (umol/kg)", " (umol/kg)", " (ug/kg)", " (ug/kg)", " (umol/kg)", " (umol/kg)", " (cells*10^8/kg)", " (mgC/m³/day)"]
 names_units = [arr_names_pp + arr_units for arr_names_pp, arr_units in zip(arr_names, arr_units)]
 
 # Remove outliers using Chauvenet's criterion
