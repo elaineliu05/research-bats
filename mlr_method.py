@@ -12,16 +12,15 @@ from tabulate import tabulate
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 from matplotlib.colors import LinearSegmentedColormap
 
-
-
 # Load dataset
-file_path = 'C:/Users/elain/OneDrive/Documents/Research - BATS/matched_data_closest.xlsx'
-df = pd.read_excel(file_path)
-df = df.apply(pd.to_numeric, errors='coerce').astype('float64')
-df['yymmdd'] = pd.to_datetime(df['yymmdd'], format='%Y%m%d') 
-df['day_of_year'] = df['yymmdd'].dt.dayofyear
-df['PP'] = df['PP'] * 12 #converting from mmolC to mgC
+file_path = 'C:/Users/elain/OneDrive/Documents/Research - BATS/matched_data_from_BATS_trimmed.csv'
+df = pd.read_csv(file_path)
+df[df.columns[1:]] = df[df.columns[1:]].apply(pd.to_numeric, errors='coerce').astype('float64') #apply to everything except yymmdd
 
+df['yymmdd'] = pd.to_datetime(df['yymmdd']) 
+# df['day_of_year'] = df['yymmdd'].dt.dayofyear
+# df['PP'] = df['PP'] * 12 #converting from mmolC to mgC
+df.to_csv('looksie.csv', index=False, na_rep='#N/A')
 df_a = df
 df_a = df_a.dropna() #drop NaNs
 df_b = df[["yymmdd", "day_of_year", "Depth", "Chl", "Temp", "Sal", "NO3", "PO4", "POC", "PON", "POP", "TOC", "TON", "TOP", "BAC", "PP"]]
