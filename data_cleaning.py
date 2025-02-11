@@ -45,9 +45,10 @@ fig, axs = plt.subplots(4, 4, figsize=(12, 7))
 axs = axs.ravel()
 for i in range(len(arr_names)):
     x_min = datetime.datetime(1988, 1, 1)
-    x_max = datetime.datetime(2016, 12, 31)
+    x_max = datetime.datetime(2023, 12, 31)
     if (arr_names[i] == 'Chl'):
         chl_df = df[df[arr_names[i]] > -100]
+        chl_df = chauvenets_criterion(df, arr_names[i])
         scatter = axs[i].scatter(chl_df['yymmdd'], chl_df[arr_names[i]], c=chl_df['Depth'], cmap = 'viridis', s=3, linewidths=0.1)
     else:
         filtered_df = chauvenets_criterion(df, arr_names[i])

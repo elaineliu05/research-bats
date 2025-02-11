@@ -13,14 +13,13 @@ from statsmodels.stats.outliers_influence import variance_inflation_factor
 from matplotlib.colors import LinearSegmentedColormap
 
 # Load dataset
-file_path = 'C:/Users/elain/OneDrive/Documents/Research - BATS/matched_data_from_BATS_trimmed.csv'
-df = pd.read_csv(file_path)
+file_path = 'C:/Users/elain/OneDrive/Documents/Research - BATS/matched_data_from_BATS.xlsx'
+df = pd.read_excel(file_path)
 df[df.columns[1:]] = df[df.columns[1:]].apply(pd.to_numeric, errors='coerce').astype('float64') #apply to everything except yymmdd
 
 df['yymmdd'] = pd.to_datetime(df['yymmdd']) 
 # df['day_of_year'] = df['yymmdd'].dt.dayofyear
 # df['PP'] = df['PP'] * 12 #converting from mmolC to mgC
-df.to_csv('looksie.csv', index=False, na_rep='#N/A')
 df_a = df
 df_a = df_a.dropna() #drop NaNs
 df_b = df[["yymmdd", "day_of_year", "Depth", "Chl", "Temp", "Sal", "NO3", "PO4", "POC", "PON", "POP", "TOC", "TON", "TOP", "BAC", "PP"]]
@@ -108,8 +107,8 @@ plt.tight_layout()
 plt.show()
 
 #Multiple Linear Regression
-X = df_c[["day_of_year", "Depth", "Chl", "Temp", "O2", "NO3", "PO4", "POC", "PON", "TOP", "BAC"]]  # Predictors (Independent variables)
-Y = df_c['PP']                                                                                     # Response (Dependent variable)
+X = df_a[["day_of_year", "Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "TOC", "TON", "TOP", "BAC"]]  # Predictors (Independent variables)
+Y = df_a['PP']                                                                                     # Response (Dependent variable)
 X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=42) # split data
 # make model
 model = LinearRegression()
@@ -128,9 +127,7 @@ axs[0].scatter(df.loc[Y_test.index, 'day_of_year'], Y_test, color='lightskyblue'
 axs[0].scatter(df.loc[Y_test.index, 'day_of_year'], Y_pred, color='salmon', label='Predicted PP', s=10)
 neg_acc = np.sum(Y_test < 0)
 neg_pred = np.sum(Y_pred < 0)
-print("Number of negative values:", neg_acc, "\ntotal values:", len(Y_test))
 print("Percentage of negative values:", neg_acc / len(Y_test) * 100)
-print("Number of negative predictions:", neg_pred, "\ntotal predictions:", len(Y_pred))
 print("Percentage of negative predictions:", neg_pred / len(Y_pred) * 100)
 axs[0].set_xlabel('Day of Year')
 axs[0].set_ylabel('Primary Productivity (mgC/m³/day)')
@@ -175,7 +172,7 @@ def monte_carlo(X, Y):
     predictions["RMSE"] = np.around(RMSE_arr, decimals = 3)            #all rmses
     predictions["R^2"] = np.around(R2_arr, decimals = 2)               #all r^2s
     monte_head = ["Simulation", "Root Mean Squared Error", "R² Score"]
-    print(tabulate(predictions, headers=monte_head))
+    #print(tabulate(predictions, headers=monte_head))
     print("Average RMSE", predictions['RMSE'].mean())
     RMSES.append(predictions['RMSE'].mean())
     RMSE_SD.append(predictions['RMSE'].std())
@@ -194,9 +191,13 @@ X_c = df_c[["day_of_year", "Depth", "Chl", "Temp", "O2", "NO3", "PO4", "POC", "P
 Y_c = df_c['PP']
 X_d = df_d[["day_of_year", "Depth", "Temp",  "O2", "NO3", "PO4"]]
 Y_d = df_d['PP']
+print('set A')
 monte_carlo(X_a, Y_a)
+print('\nset B')
 monte_carlo(X_b, Y_b)
+print('\nset C')
 monte_carlo(X_c, Y_c)
+print('\nset D')
 monte_carlo(X_d, Y_d)
 
 fig, axs = plt.subplots(1, 2, figsize = (7, 5), sharey=False)

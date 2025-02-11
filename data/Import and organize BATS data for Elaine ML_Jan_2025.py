@@ -10,7 +10,7 @@ column_names_pp = [
     "Id", "yymmdd_in", "yymmdd_out", "decy_in", "decy_out", "hhmm_in", "hhmm_out", "Lat_in", "Lat_out", 
     "Long_in", "Long_out", "QF", "Depth", "pres", "temp", "salt", "lt1", "lt2", "lt3", "dark", "t0", "pp"
 ]
-df_pp = pd.read_csv('bats_primary_production_v003.txt', sep='\s+', comment='/', names=column_names_pp, skiprows=39)
+df_pp = pd.read_csv('C:\Users\elain\OneDrive\Documents\Research - BATS\data\bats_primary_production_v003.txt', sep='\s+', comment='/', names=column_names_pp, skiprows=39)
 df_pp = df_pp.replace(-999, None)
 print("Column headers for df_pp:"), print(df_pp.columns.tolist())
 print("Primary Production Data (DF PP TXT):"), print(df_pp.head())
