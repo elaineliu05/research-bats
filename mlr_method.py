@@ -8,53 +8,44 @@ from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error, r2_score
 from scipy import stats
 from scipy.stats import norm
-from tabulate import tabulate
-from statsmodels.stats.outliers_influence import variance_inflation_factor
-from matplotlib.colors import LinearSegmentedColormap
+
 
 # Load dataset
-file_path = 'C:/Users/elain/OneDrive/Documents/Research - BATS/matched_data_from_BATS.xlsx'
-df = pd.read_excel(file_path)
+file_path = 'C:/Users/elain/OneDrive/Documents/Research - BATS/matched_data_from_BATS_trimmed.csv'
+df = pd.read_csv(file_path)
 df[df.columns[1:]] = df[df.columns[1:]].apply(pd.to_numeric, errors='coerce').astype('float64') #apply to everything except yymmdd
 
 df['yymmdd'] = pd.to_datetime(df['yymmdd']) 
 # df['day_of_year'] = df['yymmdd'].dt.dayofyear
 # df['PP'] = df['PP'] * 12 #converting from mmolC to mgC
+print("Number of rows in original dataset:", len(df))
 df_a = df
 df_a = df_a.dropna() #drop NaNs
-df_b = df[["yymmdd", "day_of_year", "Depth", "Chl", "Temp", "Sal", "NO3", "PO4", "POC", "PON", "POP", "TOC", "TON", "TOP", "BAC", "PP"]]
-df_c = df[["yymmdd", "day_of_year", "Depth", "Chl", "Temp", "O2", "NO3", "PO4", "POC", "PON", "TOP", "BAC", "PP"]]
+print("Number of rows after dropping NaNs:", len(df_a))
+df_b = df[["yymmdd", "day_of_year", "Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "BAC", "PP"]]
+df_b = df_b.dropna() #drop NaNs
+df_c = df[["yymmdd", "day_of_year", "Depth", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "BAC", "PP"]]
 df_c = df_c.dropna() #drop NaNs
 df_d = df[["yymmdd", "day_of_year", "Depth", "Temp", "O2", "NO3", "PO4", "PP"]]
 df_d = df_d.dropna() #drop NaNs
 
-print("Number of rows in original dataset:", len(df_b))
-df_b = df_b.dropna() #drop NaNs
-print("Number of rows after dropping NaNs:", len(df_b))
 
 df_arr = [df_a, df_b, df_c, df_d]
-
 for i in range(len(df_arr)):
     df_arr[i] = df_arr[i].drop_duplicates(subset=['yymmdd', 'Depth'], keep='first') #drop duplicates
-    
-arr_names_pp_dfb = ["day_of_year", "Depth", "Chl", "Temp", "Sal", "NO3", "PO4", "POC", "PON", "POP", "TOC", "TON", "TOP", "BAC", "PP"]
-arr_units_dfb = ["", " (m)", " (mg/m3)", " (C)", " (PSS-78)", " (umol/kg)", " (umol/kg)", " (ug/kg)", " (ug/kg)", " (umol/kg)", " (umol/kg)", " (umol/kg)", " (umol/kg)", " (cells*10^8/kg)", " (mgC/m³/day)"]
-names_units_dfb = [arr_names_pp + arr_units for arr_names_pp, arr_units in zip(arr_names_pp_dfb, arr_units_dfb)]
 
-arr_names_pp_dfc = ["day_of_year", "Depth", "Chl", "Temp", "O2", "NO3", "PO4", "POC", "PON", "TOP", "BAC", "PP"]
-arr_units_dfc = ["", " (m)", " (mg/m3)", " (C)", " (umol/kg)", " (umol/kg)", " (ug/kg)", " (ug/kg)", " (umol/kg)", " (umol/kg)", " (cells*10^8/kg)", " (mgC/m³/day)"]
+arr_names_pp_dfa = ["day_of_year", "Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "TOC", "TON", "TOP", "BAC", "PP"]
+arr_units_dfa = ["", " (m)", " (mg/m3)", " (C)", " (PSS-78)", " (umol/kg)"," (umol/kg)", " (umol/kg)", " (ug/kg)", " (ug/kg)", " (umol/kg)", " (umol/kg)", " (umol/kg)", " (nmol/kg)", " (cells*10^8/kg)", " (mgC/m³/day)"]
+names_units_dfa = [arr_names_pp + arr_units for arr_names_pp, arr_units in zip(arr_names_pp_dfa, arr_units_dfa)]
 
 #Chlorophyll
 df_a = df_a[df_a["Chl"] > -100] #drop NaNs
 df_b = df_b[df_b["Chl"] > -100] #drop NaNs
-df_c = df_c[df_c["Chl"] > -100] #drop NaNs
-# df_d = df_d[df_d["Chl"] > -100] #drop NaNs
 # plt.scatter(df["yymmdd"], df["Chl"], s=5)
 # plt.xlabel('time')
 # plt.ylabel('Chl mg/m3')
 # plt.tight_layout()
 # plt.show()
-
 
 # Remove outliers using Chauvenet's criterion
 def chauvenets_criterion(df, col_name): 
@@ -81,18 +72,20 @@ for i in range(2, df_d.shape[1]):
     df_d = chauvenets_criterion(df_d, df_d.columns[i])
 print("Number of rows in set D after removing outliers:", len(df_d))
 
+print('describe', df_d['PP'].describe())
+
 def round_sig(x, sig=2):
     return round(x, sig - int(f"{x:.1e}".split("e")[1]))
 #Create subplot with each variable against PP with linear regression line
 fig, axs = plt.subplots(4, 4, figsize=(12, 7))
 axs = axs.ravel()
 arr_slopes = []
-for i in range(len(arr_names_pp_dfb) - 1):
-    x= df_b[arr_names_pp_dfb[i]]
-    axs[i].scatter(x, df_b['PP'], s=5, linewidths=1)
-    axs[i].set_xlabel(names_units_dfb[i]), axs[i].set_ylabel('PP (mgC/m³/day)') 
+for i in range(len(arr_names_pp_dfa) - 1):
+    x= df_a[arr_names_pp_dfa[i]]
+    axs[i].scatter(x, df_a['PP'], s=5, linewidths=1)
+    axs[i].set_xlabel(names_units_dfa[i]), axs[i].set_ylabel('PP (mgC/m³/day)') 
     axs[i].set_xlim(x.min(), x.max()), axs[i].set_ylim(-0.1)
-    m, b, r_value, p_value, std_err = stats.linregress(x, df_b["PP"])
+    m, b, r_value, p_value, std_err = stats.linregress(x, df_a["PP"])
     arr_slopes.append(m)
     alpha = 0.05  # 95% confidence interval
     t = stats.t.ppf(1 - alpha / 2, len(x) - 2)
@@ -107,8 +100,8 @@ plt.tight_layout()
 plt.show()
 
 #Multiple Linear Regression
-X = df_a[["day_of_year", "Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "TOC", "TON", "TOP", "BAC"]]  # Predictors (Independent variables)
-Y = df_a['PP']                                                                                     # Response (Dependent variable)
+X = df_c[["day_of_year", "Depth", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "BAC"]]  # Predictors (Independent variables)
+Y = df_c['PP']                                                                              # Response (Dependent variable)
 X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=42) # split data
 # make model
 model = LinearRegression()
@@ -131,23 +124,23 @@ print("Percentage of negative values:", neg_acc / len(Y_test) * 100)
 print("Percentage of negative predictions:", neg_pred / len(Y_pred) * 100)
 axs[0].set_xlabel('Day of Year')
 axs[0].set_ylabel('Primary Productivity (mgC/m³/day)')
-axs[0].legend()
+axs[0].legend(loc = 'upper right')
 # Scatter plot for error
 error = Y_test - Y_pred
 axs[1].scatter(df.loc[Y_test.index, 'day_of_year'], error, color='darkslateblue', label='Error (Actual - Predicted)', s=10)
 axs[1].set_xlabel('Day of Year')
 axs[1].set_ylabel('Error')
-axs[1].legend()
+axs[1].legend(loc = 'upper right')
 plt.tight_layout()
 plt.show()
 
 #Multicollinearity
-df_cut = df_a[["Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "TOC", "TON", "TOP", "BAC"]]
-df_matrix = df_cut.corr(method = 'pearson').round(2)
-colors = ["navy", "aliceblue", "navy"]
-custom_cmap = LinearSegmentedColormap.from_list("custom_cmap", colors)
-sns.heatmap(df_matrix, annot=True, cmap=custom_cmap, linewidths=0.1, cbar_kws={'label': 'Correlation Coefficient'}, center = 0, vmin=-1, vmax=1)
-plt.show()
+# df_cut = df_a[["Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "TOC", "TON", "TOP", "BAC"]]
+# df_matrix = df_cut.corr(method = 'pearson').round(2)
+# colors = ["navy", "aliceblue", "navy"]
+# custom_cmap = LinearSegmentedColormap.from_list("custom_cmap", colors)
+# sns.heatmap(df_matrix, annot=True, cmap=custom_cmap, linewidths=0.1, cbar_kws={'label': 'Correlation Coefficient'}, center = 0, vmin=-1, vmax=1)
+# plt.show()
 
 # sns.pairplot(df_c[["Depth", "Chl", "Temp", "O2", "NO3", "PO4", "POC", "PON", "BAC"]], plot_kws={"s": 5})
 # plt.show()
@@ -171,7 +164,7 @@ def monte_carlo(X, Y):
     predictions["Simulations"] = np.arange(1, 11) 
     predictions["RMSE"] = np.around(RMSE_arr, decimals = 3)            #all rmses
     predictions["R^2"] = np.around(R2_arr, decimals = 2)               #all r^2s
-    monte_head = ["Simulation", "Root Mean Squared Error", "R² Score"]
+    # monte_head = ["Simulation", "Root Mean Squared Error", "R² Score"]
     #print(tabulate(predictions, headers=monte_head))
     print("Average RMSE", predictions['RMSE'].mean())
     RMSES.append(predictions['RMSE'].mean())
@@ -185,11 +178,11 @@ categories = ["Set A", "Set B", "Set C", "Set D"]
 colors = ["#F4A261", "#f6da43", "#46cdb4", "#285f94"]    
 X_a = df_a[["day_of_year", "Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "TOC", "TON", "TOP", "BAC"]]
 Y_a = df_a['PP']
-X_b = df_b[["day_of_year", "Depth", "Chl", "Temp", "Sal", "NO3", "PO4", "POC", "PON", "POP", "TOC", "TON", "TOP", "BAC"]]
+X_b = df_b[["day_of_year", "Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "BAC"]]
 Y_b = df_b['PP']
-X_c = df_c[["day_of_year", "Depth", "Chl", "Temp", "O2", "NO3", "PO4", "POC", "PON", "TOP", "BAC"]]
+X_c = df_c[["day_of_year", "Depth", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "BAC"]]
 Y_c = df_c['PP']
-X_d = df_d[["day_of_year", "Depth", "Temp",  "O2", "NO3", "PO4"]]
+X_d = df_d[["day_of_year", "Depth", "Temp", "O2", "NO3", "PO4"]]
 Y_d = df_d['PP']
 print('set A')
 monte_carlo(X_a, Y_a)
@@ -202,13 +195,13 @@ monte_carlo(X_d, Y_d)
 
 fig, axs = plt.subplots(1, 2, figsize = (7, 5), sharey=False)
 axs[0].bar(categories, R2S, color=colors)
-axs[0].errorbar(categories, R2S, yerr=R2_SD, fmt="o", color="k")
+axs[0].errorbar(categories, R2S, yerr=R2_SD, fmt="o", color="k", capsize=3)
 axs[0].set_ylabel('Average R^2 Score')
-axs[0].set_ylim(0, 1) 
+axs[0].set_ylim(0, 0.75) 
 axs[1].bar(categories, RMSES, color=colors)
-axs[1].errorbar(categories, RMSES, yerr=RMSE_SD, fmt="o", color="k")
-axs[1].set_ylabel('Average RMSE')
-axs[1].set_ylim(0, 3.2)   
+axs[1].errorbar(categories, RMSES, yerr=RMSE_SD, fmt="o", color="k", capsize=3)
+axs[1].set_ylabel('Average RMSE (mgC/m3/day)')
+axs[1].set_ylim(0, 2.5)   
 plt.tight_layout()
 plt.show()
 
@@ -225,15 +218,22 @@ plt.show()
 # plt.show()
 
 #Converting pp to mgC/m2/day
-df_d['Depth_intervals'] = df_d.groupby('yymmdd')['Depth'].diff().fillna(1) #calculate depth intervals
-df_d['PP_m2'] = (df_d['PP'] + df_d['PP'].shift(-1)) / 2 * df_d['Depth_intervals'] #trapezoidal integration method
-df_d['PP_m2'] = df_d['PP_m2'].fillna(0)  # Handle NaN in the last interval
-PP_m2_day = df_d.groupby('yymmdd')['PP_m2'].sum().reset_index() #adding up values for each day
+df_reorder = df_d #index 1 is row 4
+dates = ['2007-07-19', '2007-08-17', '2007-12-06']
 
-# start = '1987-01-01'
-# end = '1997-6-15'
-# df_slice = PP_m2_day[(PP_m2_day['yymmdd'] >= start) & (PP_m2_day['yymmdd'] <= end)]
+copy = df_reorder
+for i in dates:
+    # copy = copy[copy['yymmdd'] == i] 
+    df_reorder = df_reorder[df_reorder['yymmdd'] == i].sort_values(by='Depth', ascending=True)
+    # copy.update(copy_sorted)
+df_reorder.to_csv('peek.csv', index=False) 
 
+df_reorder['Depth_intervals'] = df_reorder.groupby('yymmdd')['Depth'].diff().fillna(1) #calculate depth intervals
+df_reorder['PP_m2'] = (df_reorder['PP'] + df_reorder['PP'].shift(-1)) / 2 * df_reorder['Depth_intervals'] #trapezoidal integration method
+df_reorder['PP_m2'] = df_reorder['PP_m2'].fillna(0)  # Handle NaN in the last interval
+PP_m2_day = df_reorder.groupby('yymmdd')['PP_m2'].sum().reset_index() #adding up values for each day
+df_reorder.to_csv('df_reordered.csv', index=False)
+PP_m2_day.to_csv('peek.csv', index=False) 
 plt.plot(PP_m2_day['yymmdd'], PP_m2_day['PP_m2'])
 plt.ylim(0, 1200)
 plt.xlabel('Date')
@@ -260,6 +260,7 @@ plt.show()
 # plt.ylabel("Depth (m)")
 # plt.title("Time Series Contour Plot of Primary Productivity")
 # plt.show()
+
 
 # #Comparing MLR and linear reg 
 # slopes = pd.DataFrame()

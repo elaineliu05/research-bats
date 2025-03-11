@@ -2,7 +2,8 @@ import numpy as np
 import pandas as pd
 import datetime
 import matplotlib.pyplot as plt
-from scipy import stats
+import matplotlib.ticker as ticker
+import matplotlib.dates as mdates
 from scipy.stats import norm
 
 file_path = 'C:/Users/elain/OneDrive/Documents/Research - BATS/matched_data_from_BATS.xlsx'
@@ -43,6 +44,7 @@ def chauvenets_criterion(df, col_name):
 
 fig, axs = plt.subplots(4, 4, figsize=(12, 7))
 axs = axs.ravel()
+print(df.head())
 for i in range(len(arr_names)):
     x_min = datetime.datetime(1988, 1, 1)
     x_max = datetime.datetime(2023, 12, 31)
@@ -56,7 +58,8 @@ for i in range(len(arr_names)):
     print(f"num rows after removing outliers for {arr_names[i]}: {len(filtered_df)}")
     axs[i].set_xlabel("Date"), axs[i].set_ylabel(names_units[i])
     axs[i].set_xlim(x_min, x_max)
-    axs[i].tick_params(axis = 'x', rotation=45)
+    axs[i].xaxis.set_major_locator(ticker.MaxNLocator(5))
+    axs[i].xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
     axs[i].set_title(f"{arr_names[i]}")
 plt.tight_layout()
 plt.show()
