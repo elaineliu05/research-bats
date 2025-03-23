@@ -2,15 +2,12 @@ import numpy as np
 import pandas as pd
 import math
 import matplotlib.pyplot as plt
-import seaborn as sns
-import graphviz
-from sklearn import tree
 from sklearn.tree import export_graphviz
+import graphviz
+import xgboost as xgb
+from xgboost import XGBRegressor
 from sklearn.metrics import mean_squared_error, r2_score
-from scipy import stats
 from scipy.stats import norm
-from sklearn.preprocessing import LabelEncoder
-from sklearn.impute import KNNImputer
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.ensemble import RandomForestRegressor
@@ -23,10 +20,38 @@ df['year'] = df['yymmdd'].dt.year
 df['month'] = df['yymmdd'].dt.month
 df['day'] = df['yymmdd'].dt.day
 print(df.isnull().sum())
+
 print("Number of rows in original dataset:", len(df))
-df = df.dropna()
-print("Number of rows after dropping NaNs:", len(df))
-df = df[df["Chl"] > -100] #drop NaNs
+df_a = df
+df_a = df_a.dropna() #drop NaNs
+df_a.to_csv('df_a.csv', index=False) 
+print("Number of rows after dropping NaNs:", len(df_a))
+
+# #imputing!
+# X_dfa = df_a.drop(columns = ['yymmdd', 'PP'])  # Predictors (Independent variables)
+# Y_dfa = df_a['PP']
+# imputer = IterativeImputer()
+# imputed = imputer.fit_transform(X_dfa)
+# imputed_df_a = pd.DataFrame(imputed, columns = X_dfa.columns)
+# imputed_df_a['PP'] = Y_dfa
+# imputed_df_a.to_csv('imputed_df_a.csv', index=False) 
+# #count num rows w an imputed value
+# imputed_mask = imputed_df_a.ne(X_dfa)  # Compare element-wise
+# imputed_rows = imputed_mask.any(axis=1)  # Check if any column has a change in a row
+# num_imputed_rows = imputed_rows.sum()
+# print(f"Number of rows with at least one imputed value: {num_imputed_rows}")
+
+df_b = df[["year", "month", "day", "day_of_year", "Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "BAC", "PP"]]
+df_b = df_b.dropna() #drop NaNs
+df_c = df[["year", "month", "day", "day_of_year", "Depth", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "BAC", "PP"]]
+df_c = df_c.dropna() #drop NaNs
+df_d = df[["year", "month", "day", "day_of_year", "Depth", "Temp", "O2", "NO3", "PO4", "PP"]]
+df_d = df_d.dropna() #drop NaNs
+
+#chlorophyll
+df_a = df_a[df_a["Chl"] > -100] #drop NaNs
+df_b = df_b[df_b["Chl"] > -100] #drop NaNs
+
 def chauvenets_criterion(df, col_name): 
     data = df[col_name]
     mean = np.mean(data)
@@ -38,16 +63,28 @@ def chauvenets_criterion(df, col_name):
     non_outliers = probabilities >= criterion
     return df[non_outliers]
 
-for i in range(2, df.shape[1]):
-    df = chauvenets_criterion(df, df.columns[i])
-print("Number of rows after removing outliers:", len(df))
+for i in range(2, df_a.shape[1]):
+    df_a = chauvenets_criterion(df_a, df_a.columns[i])
+print("Number of rows in set A after removing outliers:", len(df_a))
+for i in range(2, df_b.shape[1]):
+    df_b = chauvenets_criterion(df_b, df_b.columns[i])
+print("Number of rows in set B after removing outliers:", len(df_b))
+for i in range(2, df_c.shape[1]):
+    df_c = chauvenets_criterion(df_c, df_c.columns[i])
+print("Number of rows in set C after removing outliers:", len(df_c))
+for i in range(2, df_d.shape[1]):
+    df_d = chauvenets_criterion(df_d, df_d.columns[i])
+print("Number of rows in set D after removing outliers:", len(df_d))
 
-X = df[["day_of_year", "Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "TOC", "TON", "TOP", "BAC"]]  # Predictors (Independent variables)
-Y = df['PP'] 
+X = df_a.drop(columns = ['yymmdd', 'PP'])  # Predictors (Independent variables)
+Y = df_a['PP'] 
 X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=0) # split data
 rfr = RandomForestRegressor(n_estimators=300, random_state=0, oob_score=True)
 rfr.fit(X_train, Y_train)
 Y_pred = rfr.predict(X_test)
+
+print('first tree depth: ', rfr.estimators_[0].get_depth(), 'first tree leaves: ', rfr.estimators_[0].get_n_leaves())
+print('last tree depth: ', rfr.estimators_[-1].get_depth(), 'last tree leaves: ', rfr.estimators_[-1].get_n_leaves())
 
 oob_score = round(rfr.oob_score_, 4)
 print(f'Out-of-Bag Score: {oob_score}') #average prediction error for each test sample
@@ -59,32 +96,6 @@ feature_importances = rfr.feature_importances_
 feature_importances = [round(importance, 4) for importance in feature_importances]
 print(f'Feature importances: {feature_importances}')
 
-
-fn=["day_of_year", "Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "TOC", "TON", "TOP", "BAC"]
-cn=["PP"]
-
-# single_tree = rfr.estimators_[0]
-# dot_data = export_graphviz(single_tree, 
-#                            out_file=None, 
-#                            feature_names=X.columns, 
-#                            filled=True, 
-#                            rounded=True, 
-#                            special_characters=True)
-# graph = graphviz.Source(dot_data)
-# graph.render("random_forest_tree")  # Saves the tree as a file
-# graph.view()  # Opens the tree visualization
-fig, ax = plt.subplots(nrows = 1,ncols = 1,figsize = (4,4), dpi=800)
-tree.plot_tree(rfr.estimators_[0],
-               feature_names = fn, 
-               class_names=cn,
-               filled = True, 
-               ax=ax);
-for item in ax.get_children():  
-    if isinstance(item, plt.Rectangle):  # Check if it's a rectangle (decision node)
-        item.set_linewidth(0.5)  # Adjust the border thickness
-
-fig.savefig('rf_onetree.png')
-plt.show()
 #Plot predictions 
 fig, axs = plt.subplots(2, 1)
 # Scatter plot for actual PP values
@@ -106,28 +117,35 @@ axs[1].legend(loc = 'upper right')
 plt.tight_layout()
 plt.show()
 
-#plotting feature importances
-fig = plt.figure(figsize=(14, 5))
-plt.bar(X.columns, rfr.feature_importances_)
-plt.show()
+# #plotting feature importances
+# fig = plt.figure(figsize=(14, 5))
+# plt.bar(X.columns, rfr.feature_importances_)
+# plt.show()
 
-# Grid search
-# param_grid = {
-#     'n_estimators': [100, 300, 500],
-#     'max_depth':[10, 20, 30], 
-#     'min_samples_split':[2, 5, 10],
-#     'min_samples_leaf':[1, 2, 4],
-# }
-# from sklearn.model_selection import GridSearchCV
-# grid_search = GridSearchCV(estimator=rfr, param_grid=param_grid, cv=5, n_jobs=-1, verbose=2)
-# grid_search.fit(X_train, Y_train)
-# best_params = grid_search.best_params_
-# print(f'Best parameters: {best_params}')
-# best_estimator = grid_search.best_estimator_
-# Y_pred = best_estimator.predict(X_test)
-# oob_score = round(best_estimator.oob_score_, 4)
-# print(f'Out-of-Bag Score: {oob_score}')
-# mse = round(mean_squared_error(Y_test, Y_pred), 4)
-# print("Root mean squared error (RMSE): %.2f" % math.sqrt(mean_squared_error(Y_test, Y_pred)))
+# X = df_d.drop(columns = ['PP'])  # Predictors (Independent variables)
+# Y = df_d['PP'] 
+# X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=0) # split data
+# rfr = RandomForestRegressor(n_estimators=300, random_state=0, max_depth=10, min_samples_split=100, min_samples_leaf=50, oob_score=True)
+# rfr.fit(X_train, Y_train)
+# Y_pred = rfr.predict(X_test)
 # r2 = round(r2_score(Y_test, Y_pred), 4)
-# print(f'R-squared: {r2}')
+# print(f'Simple tree R-squared: {r2}')
+
+# dot_data = export_graphviz(rfr.estimators_[0], 
+#                            out_file=None, 
+#                            feature_names=X.columns,
+#                            filled=True,
+#                            rounded=True,
+#                            special_characters=True,
+#                            impurity=False,  # Hides MSE
+#                            proportion=False, # Hides proportion of samples
+#                            precision=2,
+#                            )
+
+# graph = graphviz.Source(dot_data)
+# graph.render("tree_visualization", format="png", cleanup=True)  # Saves as PNG
+# graph.view()  # Opens the visualization
+
+#XGBoost
+import xgboost as xgb
+xgb = xgb.XGBRegressor(n_estimators = 300, learning_rate = 0.1, max_depth = 10, min_child_weight = 1, subsample = 0.8, colsample_bytree = 0.8, gamma = 0, random_state = 42)
