@@ -16,17 +16,20 @@ df = pd.read_csv(file_path)
 df[df.columns[1:]] = df[df.columns[1:]].apply(pd.to_numeric, errors='coerce').astype('float64') #apply to everything except yymmdd
 
 df['yymmdd'] = pd.to_datetime(df['yymmdd']) 
+df['year'] = df['yymmdd'].dt.year
+df['month'] = df['yymmdd'].dt.month
+df['day'] = df['yymmdd'].dt.day
 # df['day_of_year'] = df['yymmdd'].dt.dayofyear
 # df['PP'] = df['PP'] * 12 #converting from mmolC to mgC
 print("Number of rows in original dataset:", len(df))
 df_a = df
 df_a = df_a.dropna() #drop NaNs
 print("Number of rows after dropping NaNs:", len(df_a))
-df_b = df[["yymmdd", "day_of_year", "Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "BAC", "PP"]]
+df_b = df[["yymmdd", "year", "month", "day", "day_of_year", "Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "BAC", "PP"]]
 df_b = df_b.dropna() #drop NaNs
-df_c = df[["yymmdd", "day_of_year", "Depth", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "BAC", "PP"]]
+df_c = df[["yymmdd", "year", "month", "day", "day_of_year", "Depth", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "BAC", "PP"]]
 df_c = df_c.dropna() #drop NaNs
-df_d = df[["yymmdd", "day_of_year", "Depth", "Temp", "O2", "NO3", "PO4", "PP"]]
+df_d = df[["yymmdd", "year", "month", "day", "day_of_year", "Depth", "Temp", "O2", "NO3", "PO4", "PP"]]
 df_d = df_d.dropna() #drop NaNs
 
 
@@ -118,7 +121,7 @@ fig, axs = plt.subplots(2, 1)
 # Scatter plot for actual PP values
 axs[0].scatter(df.loc[Y_test.index, 'day_of_year'], Y_test, color='lightskyblue', label='Actual PP', s=10)
 axs[0].scatter(df.loc[Y_test.index, 'day_of_year'], Y_pred, color='salmon', label='Predicted PP', s=10)
-neg_acc = np.sum(Y_test < 0)
+neg_acc = np.sum(Y_test < 0) 
 neg_pred = np.sum(Y_pred < 0)
 print("Percentage of negative values:", neg_acc / len(Y_test) * 100)
 print("Percentage of negative predictions:", neg_pred / len(Y_pred) * 100)
@@ -129,10 +132,26 @@ axs[0].legend(loc = 'upper right')
 error = Y_test - Y_pred
 axs[1].scatter(df.loc[Y_test.index, 'day_of_year'], error, color='darkslateblue', label='Error (Actual - Predicted)', s=10)
 axs[1].set_xlabel('Day of Year')
-axs[1].set_ylabel('Error')
+axs[1].set_ylabel('Error (mgC/m³/day)')
 axs[1].legend(loc = 'upper right')
 plt.tight_layout()
 plt.show()
+
+#monthly sum of errors
+testing_months = df.loc[Y_test.index, 'month']
+residuals_df = pd.DataFrame({
+    'month': testing_months,
+    'error': error
+})
+monthly_error_sum = residuals_df.groupby('month')['error'].sum()
+print("monthly error sum:", monthly_error_sum)
+plt.figure(figsize=(8, 5))
+plt.plot(monthly_error_sum.index, monthly_error_sum.values, marker='o', linestyle='-', color='cornflowerblue')
+plt.xlabel('Month')
+plt.ylabel('Sum of Residuals (mgC/m³/day)')
+plt.xticks(range(1, 13))
+plt.show()
+
 
 #Multicollinearity
 # df_cut = df_a[["Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "TOC", "TON", "TOP", "BAC"]]
@@ -174,36 +193,45 @@ def monte_carlo(X, Y):
     R2_SD.append(predictions['R^2'].std())
 
 #comparison bar-plot of r^2 and rmse
-categories = ["Set A", "Set B", "Set C", "Set D"]
-colors = ["#F4A261", "#f6da43", "#46cdb4", "#285f94"]    
-X_a = df_a[["day_of_year", "Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "TOC", "TON", "TOP", "BAC"]]
-Y_a = df_a['PP']
-X_b = df_b[["day_of_year", "Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "BAC"]]
-Y_b = df_b['PP']
-X_c = df_c[["day_of_year", "Depth", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "BAC"]]
-Y_c = df_c['PP']
-X_d = df_d[["day_of_year", "Depth", "Temp", "O2", "NO3", "PO4"]]
-Y_d = df_d['PP']
-print('set A')
-monte_carlo(X_a, Y_a)
-print('\nset B')
-monte_carlo(X_b, Y_b)
-print('\nset C')
-monte_carlo(X_c, Y_c)
-print('\nset D')
-monte_carlo(X_d, Y_d)
+# categories = ["Set A", "Set B", "Set C", "Set D"]
+# colors = ["#F4A261", "#f6da43", "#46cdb4", "#285f94"]    
+# X_a = df_a[["day_of_year", "Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "TOC", "TON", "TOP", "BAC"]]
+# Y_a = df_a['PP']
+# X_b = df_b[["day_of_year", "Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "BAC"]]
+# Y_b = df_b['PP']
+# X_c = df_c[["day_of_year", "Depth", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "BAC"]]
+# Y_c = df_c['PP']
+# X_d = df_d[["day_of_year", "Depth", "Temp", "O2", "NO3", "PO4"]]
+# Y_d = df_d['PP']
+# print('set A')
+# monte_carlo(X_a, Y_a)
+# print('\nset B')
+# monte_carlo(X_b, Y_b)
+# print('\nset C')
+# monte_carlo(X_c, Y_c)
+# print('\nset D')
+# monte_carlo(X_d, Y_d)
 
-fig, axs = plt.subplots(1, 2, figsize = (7, 5), sharey=False)
-axs[0].bar(categories, R2S, color=colors)
-axs[0].errorbar(categories, R2S, yerr=R2_SD, fmt="o", color="k", capsize=3)
-axs[0].set_ylabel('Average R^2 Score')
-axs[0].set_ylim(0, 0.75) 
-axs[1].bar(categories, RMSES, color=colors)
-axs[1].errorbar(categories, RMSES, yerr=RMSE_SD, fmt="o", color="k", capsize=3)
-axs[1].set_ylabel('Average RMSE (mgC/m3/day)')
-axs[1].set_ylim(0, 2.5)   
-plt.tight_layout()
-plt.show()
+# fig, axs = plt.subplots(1, 2, figsize = (7, 5), sharey=False)
+# axs[0].bar(categories, R2S, color=colors)
+# axs[0].errorbar(categories, R2S, yerr=R2_SD, fmt="o", color="k", capsize=3)
+# axs[0].set_ylabel('Average R^2 Score')
+# axs[0].set_ylim(0, 0.75) 
+# axs[1].bar(categories, RMSES, color=colors)
+# axs[1].errorbar(categories, RMSES, yerr=RMSE_SD, fmt="o", color="k", capsize=3)
+# axs[1].set_ylabel('Average RMSE (mgC/m3/day)')
+# axs[1].set_ylim(0, 2.5)  
+# # print('rmse array: ', RMSES)
+# # print('rmse standard deviations: ', RMSE_SD) 
+# plt.tight_layout()
+# plt.show()
+
+#residual histogram
+# plt.figure(figsize=(8, 6))
+# plt.hist(error, color='cornflowerblue', bins=30, edgecolor='black', alpha=0.8)
+# plt.xlabel('Residual')
+# plt.ylabel('Frequency')
+# plt.show()
 
 # #property-property plot
 # plt.scatter(Y_test, Y_pred)
@@ -218,27 +246,27 @@ plt.show()
 # plt.show()
 
 #Converting pp to mgC/m2/day
-df_reorder = df_d #index 1 is row 4
-dates = ['2007-07-19', '2007-08-17', '2007-12-06']
+# df_reorder = df_d #index 1 is row 4
+# dates = ['2007-07-19', '2007-08-17', '2007-12-06']
 
-copy = df_reorder
-for i in dates:
-    # copy = copy[copy['yymmdd'] == i] 
-    df_reorder = df_reorder[df_reorder['yymmdd'] == i].sort_values(by='Depth', ascending=True)
-    # copy.update(copy_sorted)
-df_reorder.to_csv('peek.csv', index=False) 
+# copy = df_reorder
+# for i in dates:
+#     # copy = copy[copy['yymmdd'] == i] 
+#     df_reorder = df_reorder[df_reorder['yymmdd'] == i].sort_values(by='Depth', ascending=True)
+#     # copy.update(copy_sorted)
+# df_reorder.to_csv('peek.csv', index=False) 
 
-df_reorder['Depth_intervals'] = df_reorder.groupby('yymmdd')['Depth'].diff().fillna(1) #calculate depth intervals
-df_reorder['PP_m2'] = (df_reorder['PP'] + df_reorder['PP'].shift(-1)) / 2 * df_reorder['Depth_intervals'] #trapezoidal integration method
-df_reorder['PP_m2'] = df_reorder['PP_m2'].fillna(0)  # Handle NaN in the last interval
-PP_m2_day = df_reorder.groupby('yymmdd')['PP_m2'].sum().reset_index() #adding up values for each day
-df_reorder.to_csv('df_reordered.csv', index=False)
-PP_m2_day.to_csv('peek.csv', index=False) 
-plt.plot(PP_m2_day['yymmdd'], PP_m2_day['PP_m2'])
-plt.ylim(0, 1200)
-plt.xlabel('Date')
-plt.ylabel('Primary Productivity (mgC/m2/day)')
-plt.show()
+# df_reorder['Depth_intervals'] = df_reorder.groupby('yymmdd')['Depth'].diff().fillna(1) #calculate depth intervals
+# df_reorder['PP_m2'] = (df_reorder['PP'] + df_reorder['PP'].shift(-1)) / 2 * df_reorder['Depth_intervals'] #trapezoidal integration method
+# df_reorder['PP_m2'] = df_reorder['PP_m2'].fillna(0)  # Handle NaN in the last interval
+# PP_m2_day = df_reorder.groupby('yymmdd')['PP_m2'].sum().reset_index() #adding up values for each day
+# df_reorder.to_csv('df_reordered.csv', index=False)
+# PP_m2_day.to_csv('peek.csv', index=False) 
+# plt.plot(PP_m2_day['yymmdd'], PP_m2_day['PP_m2'])
+# plt.ylim(0, 1200)
+# plt.xlabel('Date')
+# plt.ylabel('Primary Productivity (mgC/m2/day)')
+# plt.show()
 
 # #contour plot
 # main_depths = [1, 20, 40, 60, 80, 100, 120, 140] #adjust depth values
@@ -269,10 +297,3 @@ plt.show()
 # slopes["LinReg"] = arr_slopes
 # slope_head = ["Var", "MLR", "LinReg"]
 # print(tabulate(slopes, headers=slope_head))
-
-# VIF 
-# vif_data = pd.DataFrame()
-# vif_data["feature"] = df_matrix.columns
-# vif_data["VIF"] = [variance_inflation_factor(df_matrix.values, i) # calculating VIF for each feature
-#     for i in range(len(df_matrix.columns))]
-# print(vif_data)
