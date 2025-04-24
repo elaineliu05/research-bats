@@ -9,11 +9,12 @@ from sklearn.metrics import mean_squared_error, r2_score
 from scipy.stats import norm
 from sklearn.model_selection import train_test_split, GridSearchCV
 import matplotlib.patches as mpatches
-from mlr_method import error as mlr_error
-from mlr_method import monthly_error_sum as mlr_monthly_error_sum
-
-from rfr_method import error as rfr_error
-from rfr_method import monthly_error_sum as rfr_monthly_error_sum
+from mlr_method import all_resid as mlr_resid
+from mlr_method import monthly_average as mlr_monthly_avg
+from mlr_method import monthly_std as mlr_monthly_std
+from rfr_method import all_resid as rfr_resid
+from rfr_method import monthly_average as rfr_monthly_avg
+from rfr_method import monthly_std as rfr_monthly_std
 
 #XGBoost
 import xgboost as xgb
@@ -82,35 +83,6 @@ feature_importances = xgb_mod.feature_importances_
 feature_importances = [round(importance, 4) for importance in feature_importances]
 print(f'XGB Feature importances: {feature_importances}')
 
-#Monte Carlo simulation
-predictions = pd.DataFrame()
-xgb_rmses = []
-xgb_rmse_sd = []
-xgb_r2s = []
-xgb_r2_sd = []
-def xgb_monte_carlo(X, Y):
-    Rmse_arr = []
-    R2_arr = []
-    for i in range(10):
-        X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=i) # split data
-        xgb_mod = xgb.XGBRegressor(n_estimators = 500, learning_rate = 0.1, max_depth = 10, min_child_weight = 5, subsample = 0.6, colsample_bytree = 0.8, gamma = 0, random_state = i)
-        xgb_mod.fit(X_train, Y_train)
-        Y_pred = xgb_mod.predict(X_test)
-        Rmse_arr.append(math.sqrt(mean_squared_error(Y_test, Y_pred))) #arr of each rmse in one monte carlo
-        R2_arr.append(r2_score(Y_test, Y_pred))                        #arr of each r^2 in one monte carlo
-    predictions["Simulations"] = np.arange(1, 11) 
-    predictions["RMSE"] = np.around(Rmse_arr, decimals = 3)            #all rmses
-    predictions["R^2"] = np.around(R2_arr, decimals = 2)               #all r^2s
-    # monte_head = ["Simulation", "Root Mean Squared Error", "R² Score"]
-    #print(tabulate(predictions, headers=monte_head))
-    print("Average RMSE", predictions['RMSE'].mean())
-    xgb_rmses.append(round(predictions['RMSE'].mean(), 2))
-    xgb_rmse_sd.append(predictions['RMSE'].std())
-    print("Average R²", predictions['R^2'].mean())
-    xgb_r2s.append(round(predictions['R^2'].mean(), 3))
-    xgb_r2_sd.append(predictions['R^2'].std())
-# xgb_monte_carlo(X, Y)
-
 #Plot predictions 
 fig, axs = plt.subplots(2, 1)
 # Scatter plot for actual PP values
@@ -132,82 +104,127 @@ axs[1].legend(loc = 'upper right')
 plt.tight_layout()
 plt.show()
 
-#monthly sum of errors
-testing_months = df.loc[Y_test.index, 'month']
-residuals_df = pd.DataFrame({
-    'month': testing_months,
-    'error': error
-})
-monthly_error_sum = residuals_df.groupby('month')['error'].sum()
-plt.figure(figsize=(8, 5))
-plt.plot(monthly_error_sum.index, monthly_error_sum.values, marker='o', linestyle='-', color='gold')
-plt.xlabel('Month')
-plt.ylabel('Sum of Residuals (mgC/m³/day)')
-plt.xticks(range(1, 13))
-plt.show()
+#Monte Carlo simulation
+predictions = pd.DataFrame()
+xgb_rmses = []
+xgb_rmse_sd = []
+xgb_r2s = []
+xgb_r2_sd = []
+def xgb_monte_carlo(X, Y):
+    all_resid = []
+    month_resid = []
+    averages_arr = []
+    rmse_arr = []
+    R2_arr = []
+    for i in range(10):
+        X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=i) # split data
+        xgb_mod = xgb.XGBRegressor(n_estimators = 500, learning_rate = 0.1, max_depth = 10, min_child_weight = 5, subsample = 0.6, colsample_bytree = 0.8, gamma = 0, random_state = i)
+        xgb_mod.fit(X_train, Y_train)
+        Y_pred = xgb_mod.predict(X_test)
+        #metrics
+        rmse_arr.append(math.sqrt(mean_squared_error(Y_test, Y_pred))) #arr of each rmse in one monte carlo
+        R2_arr.append(r2_score(Y_test, Y_pred))  
+        #residuals
+        resid_arr = Y_test - Y_pred 
+        all_resid.append(resid_arr)
+        #monthly sum stuff
+        resid_arr.index = df.loc[Y_test.index, 'month'].values
+        month_resid.append(resid_arr)
+        averages = resid_arr.groupby(resid_arr.index).mean()
+        averages_arr.append(averages) #append monthly averages to list
 
-#residual histogram
-plt.figure(figsize=(8, 6))
-plt.hist(error, color='gold', bins=30, edgecolor='black', alpha=0.5)
-plt.xlabel('Residual')
-plt.ylabel('Frequency')
-plt.show()
+    month_resid = pd.concat(month_resid) #flatten into dataframe
+    monthly_average = month_resid.groupby(month_resid.index).mean()
+    monthly_avg_df = pd.DataFrame(averages_arr)
+    print('monthly average df', monthly_avg_df)
+    monthly_std = monthly_avg_df.std()
+    print('monthly std', monthly_std)
+
+    all_resid = np.concatenate(all_resid) #flatten array 
+
+    predictions["Simulations"] = np.arange(1, 11) 
+    predictions["RMSE"] = np.around(rmse_arr, decimals = 3)            #all rmses
+    predictions["R^2"] = np.around(R2_arr, decimals = 2)               #all r^2s
+    # monte_head = ["Simulation", "Root Mean Squared Error", "R² Score"]
+    #print(tabulate(predictions, headers=monte_head))
+    print("Average RMSE", predictions['RMSE'].mean())
+    xgb_rmses.append(round(predictions['RMSE'].mean(), 2))
+    xgb_rmse_sd.append(predictions['RMSE'].std())
+    print("Average R²", predictions['R^2'].mean())
+    xgb_r2s.append(round(predictions['R^2'].mean(), 3))
+    xgb_r2_sd.append(predictions['R^2'].std())
+    return all_resid, monthly_average, monthly_std
 
 #comparison bar-plot of r^2 and rmse
-sets = ["Set A", "Set B", "Set C", "Set D"]
-colors = ["#F4A261", "#f6da43", "#46cdb4", "#285f94"]    
-X_a = df_a.drop(columns = ['yymmdd', 'PP'])
-Y_a = df_a['PP']
-X_b = df_b.drop(columns = ['PP'])
-Y_b = df_b['PP']
+# sets = ["Set A", "Set B", "Set C", "Set D"]
+# colors = ["#F4A261", "#f6da43", "#46cdb4", "#285f94"]    
+# X_a = df_a.drop(columns = ['yymmdd', 'PP'])
+# Y_a = df_a['PP']
+# X_b = df_b.drop(columns = ['PP'])
+# Y_b = df_b['PP']
 X_c = df_c.drop(columns = ['PP'])
 Y_c = df_c['PP']
-X_d = df_d.drop(columns = ['PP'])
-Y_d = df_d['PP']
+# X_d = df_d.drop(columns = ['PP'])
+# Y_d = df_d['PP']
 # print('set A')
 # xgb_monte_carlo(X_a, Y_a)
 # print('\nset B')
 # xgb_monte_carlo(X_b, Y_b)
-# print('\nset C')
-# xgb_monte_carlo(X_c, Y_c)
+print('\nset C')
+xgb_resid, xgb_monthly_avg, xgb_monthly_std = xgb_monte_carlo(X_c, Y_c)
 # print('\nset D')
 # xgb_monte_carlo(X_d, Y_d)
 
-#residual histogram
+# residual histogram
+plt.figure(figsize=(8, 6))
+sns.histplot(xgb_resid, color='gold', bins=30, kde = True, alpha=0.8)
+plt.xlabel('Residual  (mgC/m³/day)')
+plt.ylabel('Frequency')
+plt.show()
+
+#monthly sum of residuals lineplot
+plt.figure(figsize=(8, 5))
+plt.errorbar(xgb_monthly_avg.index, xgb_monthly_avg.values, yerr=xgb_monthly_std.values, fmt='o-', color='gold', ecolor='#fae97a', capsize=3)
+plt.xlabel('Month')
+plt.ylabel('Average Residuals (mgC/m³/day)')
+plt.xticks(range(1, 13))
+plt.show()
+
+#compairson residual histogram
 plt.figure(figsize=(10, 6))
-sns.histplot(mlr_error, color='cornflowerblue', label='MLR Residuals', bins=30, kde = True, alpha=0.8)
-sns.histplot(rfr_error, color='yellowgreen', label='RFR Residuals', bins=30, kde = True, alpha=0.8)
-sns.histplot(error, color='gold', label='XGB Residuals', bins=30, kde = True, alpha=0.5)
+sns.histplot(mlr_resid, color='royalblue', label='MLR Residuals', bins=30, kde = True, alpha=0.85)
+sns.histplot(rfr_resid, color='yellowgreen', label='RFR Residuals', bins=30, kde = True, alpha=0.8)
+sns.histplot(xgb_resid, color='gold', label='XGB Residuals', bins=30, kde = True, alpha=0.4)
 plt.title('Residual Histograms of MLR, RFR, and XGB')
-plt.xlabel('Residual')
+plt.xlabel('Residual (mgC/m³/day)')
 plt.ylabel('Frequency')
 plt.legend()
 plt.show()
 
-#monthly sum of errors line plot
+#comparison monthly sum of errors line plot
 plt.figure()
-plt.plot(mlr_monthly_error_sum.index, mlr_monthly_error_sum.values, marker='o', linestyle='-', color='cornflowerblue', label='MLR')
-plt.plot(rfr_monthly_error_sum.index, rfr_monthly_error_sum.values, marker='o', linestyle='-', color='yellowgreen', label='RFR')
-plt.plot(monthly_error_sum.index, monthly_error_sum.values, marker='o', linestyle='-', color='gold', label='XGB')
+plt.errorbar(mlr_monthly_avg.index, mlr_monthly_avg.values, yerr=mlr_monthly_std.values, fmt='o-', color='royalblue', ecolor='cornflowerblue', capsize=4, label='MLR')
+plt.errorbar(rfr_monthly_avg.index, rfr_monthly_avg.values, yerr=rfr_monthly_std.values, fmt='o-', color='yellowgreen', ecolor='#c9e675', capsize=4, label='RFR')
+plt.errorbar(xgb_monthly_avg.index, xgb_monthly_avg.values, yerr=xgb_monthly_std.values, fmt='o-', color='gold', ecolor='#fae97a', capsize=4, label='XGB')
 plt.xlabel('Month')
-plt.ylabel('Sum of Residuals (mgC/m³/day)')
+plt.ylabel('Average Residuals (mgC/m³/day)')
 plt.xticks(range(1, 13))
 plt.legend()
 plt.show()
 
-fig, axs = plt.subplots(1, 2, figsize = (7, 5), sharey=False)
-axs[0].bar(sets, xgb_r2s, color=colors)
-axs[0].errorbar(sets, xgb_r2s, yerr=xgb_r2_sd, fmt="o", color="k", capsize=3)
-axs[0].set_ylabel('Average R^2 Score')
-axs[0].set_ylim(0, 0.8) 
-axs[1].bar(sets, xgb_rmses, color=colors)
-axs[1].errorbar(sets, xgb_rmses, yerr=xgb_rmse_sd, fmt="o", color="k", capsize=3)
-axs[1].set_ylabel('Average RMSE (mgC/m3/day)')
-axs[1].set_ylim(0, 2)   
-print('rmse array: ', xgb_rmses)
-print('rmse standard deviations: ', xgb_rmse_sd)
-plt.tight_layout()
-plt.show()
+# fig, axs = plt.subplots(1, 2, figsize = (7, 5), sharey=False)
+# axs[0].bar(sets, xgb_r2s, color=colors)
+# axs[0].errorbar(sets, xgb_r2s, yerr=xgb_r2_sd, fmt="o", color="k", capsize=3)
+# axs[0].set_ylabel('Average R^2 Score')
+# axs[0].set_ylim(0, 0.8) 
+# axs[1].bar(sets, xgb_rmses, color=colors)
+# axs[1].errorbar(sets, xgb_rmses, yerr=xgb_rmse_sd, fmt="o", color="k", capsize=3)
+# axs[1].set_ylabel('Average RMSE (mgC/m3/day)')
+# axs[1].set_ylim(0, 2)   
+# print('rmse array: ', xgb_rmses)
+# print('rmse standard deviations: ', xgb_rmse_sd)
+# plt.tight_layout()
+# plt.show()
 
 mlr_r2s = [0.56, 0.58, 0.53, 0.52]
 mlr_r2_sd = [0.039, 0.033, 0.028, 0.022]
@@ -222,53 +239,52 @@ xgb_r2_sd = [0.039, 0.057, 0.035, 0.029]
 xgb_rmses = [1.47, 1.49, 1.71, 1.72]
 xgb_rmse_sd = [0.070, 0.142, 0.100, 0.130]
 
-#r2 comparison
-plt.figure(figsize=(10, 6))
-r2_data = np.array([mlr_r2s, rfr_r2s, xgb_r2s])
-sd_data = np.array([mlr_r2_sd, rfr_r2_sd, xgb_r2_sd])
-model_labels = ['MLR', 'RFR', 'XGB']
-patterns = ['/', 'x', '.']  
-x = np.arange(len(sets))
-width = 0.25
-for i, (r2_vals, r2_sds, model) in enumerate(zip(r2_data, sd_data, model_labels)):
-    plt.bar(x + i * width, r2_vals, width=width, label=model, color=colors, hatch=patterns[i], edgecolor='black', yerr=r2_sds, capsize=5, ecolor='black', error_kw={'elinewidth': 1})
-plt.xticks(x + width, sets)  
-plt.xlabel("Predictor Sets")
-plt.ylabel("R² Score")
-plt.title("R² Score Comparison Across Models and Predictor Sets")
-import matplotlib.patches as mpatches
-legend_handles = [
-    mpatches.Patch(facecolor='white', edgecolor='black', hatch='/', label="MLR"),
-    mpatches.Patch(facecolor='white', edgecolor='black', hatch='x', label="RFR"),
-    mpatches.Patch(facecolor='white', edgecolor='black', hatch='.', label="XGB")
-]
-plt.legend(handles = legend_handles, title="Model", loc="upper center",  handleheight=5.5, handlelength=4, ncol=3)
-plt.ylim(0, 1)  # Adjust based on R² range
-plt.show()
+# #r2 comparison
+# plt.figure(figsize=(10, 6))
+# r2_data = np.array([mlr_r2s, rfr_r2s, xgb_r2s])
+# sd_data = np.array([mlr_r2_sd, rfr_r2_sd, xgb_r2_sd])
+# model_labels = ['MLR', 'RFR', 'XGB']
+# patterns = ['/', 'x', '.']  
+# x = np.arange(len(sets))
+# width = 0.25
+# for i, (r2_vals, r2_sds, model) in enumerate(zip(r2_data, sd_data, model_labels)):
+#     plt.bar(x + i * width, r2_vals, width=width, label=model, color=colors, hatch=patterns[i], edgecolor='black', yerr=r2_sds, capsize=5, ecolor='black', error_kw={'elinewidth': 1})
+# plt.xticks(x + width, sets)  
+# plt.xlabel("Predictor Sets")
+# plt.ylabel("R² Score")
+# plt.title("R² Score Comparison Across Models and Predictor Sets")
+# import matplotlib.patches as mpatches
+# legend_handles = [
+#     mpatches.Patch(facecolor='white', edgecolor='black', hatch='/', label="MLR"),
+#     mpatches.Patch(facecolor='white', edgecolor='black', hatch='x', label="RFR"),
+#     mpatches.Patch(facecolor='white', edgecolor='black', hatch='.', label="XGB")
+# ]
+# plt.legend(handles = legend_handles, title="Model", loc="upper center",  handleheight=5.5, handlelength=4, ncol=3)
+# plt.ylim(0, 1)  # Adjust based on R² range
+# plt.show()
 
-#rmse comparison
-plt.figure(figsize=(10, 6))
-rmse_data = np.array([mlr_rmses, rfr_rmses, xgb_rmses])
-sd_data = np.array([mlr_rmse_sd, rfr_rmse_sd, xgb_rmse_sd])
-model_labels = ['MLR', 'RFR', 'XGB']
-patterns = ['/', 'x', '.']  
-x = np.arange(len(sets))
-width = 0.25
-for i, (rmse_vals, rmse_sds, model) in enumerate(zip(rmse_data, sd_data, model_labels)):
-    plt.bar(x + i * width, rmse_vals, width=width, label=model, color=colors, hatch=patterns[i], edgecolor='black', yerr=rmse_sds, capsize=5, ecolor='black', error_kw={'elinewidth': 1})
-plt.xticks(x + width, sets)  
-plt.xlabel("Predictor Sets")
-plt.ylabel("RMSE (mgC/m³/day)")
-plt.title("RMSE Comparison Across Models and Predictor Sets")
-import matplotlib.patches as mpatches
-legend_handles = [
-    mpatches.Patch(facecolor='white', edgecolor='black', hatch='/', label="MLR"),
-    mpatches.Patch(facecolor='white', edgecolor='black', hatch='x', label="RFR"),
-    mpatches.Patch(facecolor='white', edgecolor='black', hatch='.', label="XGB")
-]
-plt.legend(handles = legend_handles, title="Model", loc="upper center",  handleheight=5.5, handlelength=4, ncol=3)
-plt.ylim(0, 2.7)  # Adjust based on R² range
-plt.show()
+# #rmse comparison
+# plt.figure(figsize=(10, 6))
+# rmse_data = np.array([mlr_rmses, rfr_rmses, xgb_rmses])
+# sd_data = np.array([mlr_rmse_sd, rfr_rmse_sd, xgb_rmse_sd])
+# model_labels = ['MLR', 'RFR', 'XGB']
+# patterns = ['/', 'x', '.']  
+# x = np.arange(len(sets))
+# width = 0.25
+# for i, (rmse_vals, rmse_sds, model) in enumerate(zip(rmse_data, sd_data, model_labels)):
+#     plt.bar(x + i * width, rmse_vals, width=width, label=model, color=colors, hatch=patterns[i], edgecolor='black', yerr=rmse_sds, capsize=5, ecolor='black', error_kw={'elinewidth': 1})
+# plt.xticks(x + width, sets)  
+# plt.xlabel("Predictor Sets")
+# plt.ylabel("RMSE (mgC/m³/day)")
+# plt.title("RMSE Comparison Across Models and Predictor Sets")
+# legend_handles = [
+#     mpatches.Patch(facecolor='white', edgecolor='black', hatch='/', label="MLR"),
+#     mpatches.Patch(facecolor='white', edgecolor='black', hatch='x', label="RFR"),
+#     mpatches.Patch(facecolor='white', edgecolor='black', hatch='.', label="XGB")
+# ]
+# plt.legend(handles = legend_handles, title="Model", loc="upper center",  handleheight=5.5, handlelength=4, ncol=3)
+# plt.ylim(0, 2.7)  # Adjust based on R² range
+# plt.show()
 
 # param_grid = {
 #     'n_estimators': [500, 700], 

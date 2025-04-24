@@ -137,60 +137,58 @@ axs[1].legend(loc = 'upper right')
 plt.tight_layout()
 plt.show()
 
-#monthly sum of errors
-testing_months = df.loc[Y_test.index, 'month']
-residuals_df = pd.DataFrame({
-    'month': testing_months,
-    'error': error
-})
-monthly_error_sum = residuals_df.groupby('month')['error'].sum()
-print("monthly error sum:", monthly_error_sum)
-plt.figure(figsize=(8, 5))
-plt.plot(monthly_error_sum.index, monthly_error_sum.values, marker='o', linestyle='-', color='cornflowerblue')
-plt.xlabel('Month')
-plt.ylabel('Sum of Residuals (mgC/m³/day)')
-plt.xticks(range(1, 13))
-plt.show()
-
-
-#Multicollinearity
-# df_cut = df_a[["Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "TOC", "TON", "TOP", "BAC"]]
-# df_matrix = df_cut.corr(method = 'pearson').round(2)
-# colors = ["navy", "aliceblue", "navy"]
-# custom_cmap = LinearSegmentedColormap.from_list("custom_cmap", colors)
-# sns.heatmap(df_matrix, annot=True, cmap=custom_cmap, linewidths=0.1, cbar_kws={'label': 'Correlation Coefficient'}, center = 0, vmin=-1, vmax=1)
-# plt.show()
-
-# sns.pairplot(df_c[["Depth", "Chl", "Temp", "O2", "NO3", "PO4", "POC", "PON", "BAC"]], plot_kws={"s": 5})
-# plt.show()
 
 #Monte Carlo simulation
 predictions = pd.DataFrame()
-RMSES = []
-RMSE_SD = []
-R2S = []
-R2_SD = []
+rmses = []
+rmse_SD = []
+r2S = []
+r2_SD = []
 def monte_carlo(X, Y):
-    RMSE_arr = []
+    all_resid = []
+    month_resid = []
+    averages_arr = []
+    rmse_arr = []
     R2_arr = []
     for i in range(10):
         X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=i)
         model = LinearRegression()
         model.fit(X_train, Y_train)
         Y_pred = model.predict(X_test)
-        RMSE_arr.append(math.sqrt(mean_squared_error(Y_test, Y_pred))) #arr of each rmse in one monte carlo
-        R2_arr.append(r2_score(Y_test, Y_pred))                        #arr of each r^2 in one monte carlo
+        #metrics
+        rmse_arr.append(math.sqrt(mean_squared_error(Y_test, Y_pred))) #arr of each rmse in one monte carlo
+        R2_arr.append(r2_score(Y_test, Y_pred))  
+        #residuals
+        resid_arr = Y_test - Y_pred 
+        all_resid.append(resid_arr)
+        #monthly sum stuff
+        resid_arr.index = df.loc[Y_test.index, 'month'].values
+        month_resid.append(resid_arr)
+        averages = resid_arr.groupby(resid_arr.index).mean()
+        averages_arr.append(averages) #append monthly averages to list
+    
+    month_resid = pd.concat(month_resid) #flatten into dataframe
+    monthly_average = month_resid.groupby(month_resid.index).mean()
+    monthly_avg_df = pd.DataFrame(averages_arr)
+    print('monthly average df', monthly_avg_df)
+    monthly_std = monthly_avg_df.std()
+    print('monthly std', monthly_std)
+
+    all_resid = np.concatenate(all_resid) #flatten array 
+
     predictions["Simulations"] = np.arange(1, 11) 
-    predictions["RMSE"] = np.around(RMSE_arr, decimals = 3)            #all rmses
+    predictions["RMSE"] = np.around(rmse_arr, decimals = 3)            #all rmses
     predictions["R^2"] = np.around(R2_arr, decimals = 2)               #all r^2s
+    
     # monte_head = ["Simulation", "Root Mean Squared Error", "R² Score"]
     #print(tabulate(predictions, headers=monte_head))
     print("Average RMSE", predictions['RMSE'].mean())
-    RMSES.append(predictions['RMSE'].mean())
-    RMSE_SD.append(predictions['RMSE'].std())
+    rmses.append(predictions['RMSE'].mean())
+    rmse_SD.append(predictions['RMSE'].std())
     print("Average R²", predictions['R^2'].mean())
-    R2S.append(round(predictions['R^2'].mean(), 2))
-    R2_SD.append(predictions['R^2'].std())
+    r2S.append(round(predictions['R^2'].mean(), 2))
+    r2_SD.append(predictions['R^2'].std())
+    return all_resid, monthly_average, monthly_std
 
 #comparison bar-plot of r^2 and rmse
 # categories = ["Set A", "Set B", "Set C", "Set D"]
@@ -199,19 +197,20 @@ def monte_carlo(X, Y):
 # Y_a = df_a['PP']
 # X_b = df_b[["day_of_year", "Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "BAC"]]
 # Y_b = df_b['PP']
-# X_c = df_c[["day_of_year", "Depth", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "BAC"]]
-# Y_c = df_c['PP']
+X_c = df_c[["day_of_year", "Depth", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "BAC"]]
+Y_c = df_c['PP']
 # X_d = df_d[["day_of_year", "Depth", "Temp", "O2", "NO3", "PO4"]]
 # Y_d = df_d['PP']
 # print('set A')
 # monte_carlo(X_a, Y_a)
 # print('\nset B')
 # monte_carlo(X_b, Y_b)
-# print('\nset C')
-# monte_carlo(X_c, Y_c)
+print('\nset C')
+all_resid, monthly_average, monthly_std = monte_carlo(X_c, Y_c)
 # print('\nset D')
 # monte_carlo(X_d, Y_d)
 
+# # R^2 and RMSE bar chart
 # fig, axs = plt.subplots(1, 2, figsize = (7, 5), sharey=False)
 # axs[0].bar(categories, R2S, color=colors)
 # axs[0].errorbar(categories, R2S, yerr=R2_SD, fmt="o", color="k", capsize=3)
@@ -226,12 +225,20 @@ def monte_carlo(X, Y):
 # plt.tight_layout()
 # plt.show()
 
-#residual histogram
-# plt.figure(figsize=(8, 6))
-# plt.hist(error, color='cornflowerblue', bins=30, edgecolor='black', alpha=0.8)
-# plt.xlabel('Residual')
-# plt.ylabel('Frequency')
-# plt.show()
+# residual histogram
+plt.figure(figsize=(8, 6))
+sns.histplot(all_resid, color='royalblue', bins=30, kde = True, alpha=0.8)
+plt.xlabel('Residual  (mgC/m³/day)')
+plt.ylabel('Frequency')
+plt.show()
+
+#monthly sum of residuals lineplot
+plt.figure(figsize=(8, 5))
+plt.errorbar(monthly_average.index, monthly_average.values, yerr=monthly_std.values, fmt='o-', color='royalblue', ecolor='cornflowerblue', capsize=3)
+plt.xlabel('Month')
+plt.ylabel('Average Residuals (mgC/m³/day)')
+plt.xticks(range(1, 13))
+plt.show()
 
 # #property-property plot
 # plt.scatter(Y_test, Y_pred)
@@ -243,6 +250,16 @@ def monte_carlo(X, Y):
 # plt.ylabel('Predicted PP (mgC/m³/day)')
 # plt.title("Property-Property Plot of Predicted v Actual PP")
 # plt.tight_layout()
+# plt.show()
+
+#Multicollinearity
+# df_cut = df_a[["Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "TOC", "TON", "TOP", "BAC"]]
+# df_matrix = df_cut.corr(method = 'pearson').round(2)
+# colors = ["navy", "aliceblue", "navy"]
+# custom_cmap = LinearSegmentedColormap.from_list("custom_cmap", colors)
+# sns.heatmap(df_matrix, annot=True, cmap=custom_cmap, linewidths=0.1, cbar_kws={'label': 'Correlation Coefficient'}, center = 0, vmin=-1, vmax=1)
+# plt.show()
+# sns.pairplot(df_c[["Depth", "Chl", "Temp", "O2", "NO3", "PO4", "POC", "PON", "BAC"]], plot_kws={"s": 5})
 # plt.show()
 
 #Converting pp to mgC/m2/day
@@ -288,7 +305,6 @@ def monte_carlo(X, Y):
 # plt.ylabel("Depth (m)")
 # plt.title("Time Series Contour Plot of Primary Productivity")
 # plt.show()
-
 
 # #Comparing MLR and linear reg 
 # slopes = pd.DataFrame()

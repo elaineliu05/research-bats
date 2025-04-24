@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import seaborn as sns
 import math
 import matplotlib.pyplot as plt
 from sklearn.tree import export_graphviz
@@ -79,35 +80,6 @@ feature_importances = rfr.feature_importances_
 feature_importances = [round(importance, 4) for importance in feature_importances]
 print(f'Feature importances: {feature_importances}')
 
-#Monte Carlo simulation
-predictions = pd.DataFrame()
-RMSES = []
-RMSE_SD = []
-R2S = []
-R2_SD = []
-def rfr_monte_carlo(X, Y):
-    RMSE_arr = []
-    R2_arr = []
-    for i in range(10):
-        X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=i) # split data
-        rfr = RandomForestRegressor(n_estimators=500, random_state=i, oob_score=True)
-        rfr.fit(X_train, Y_train)
-        Y_pred = rfr.predict(X_test)
-        RMSE_arr.append(math.sqrt(mean_squared_error(Y_test, Y_pred))) #arr of each rmse in one monte carlo
-        R2_arr.append(r2_score(Y_test, Y_pred))                        #arr of each r^2 in one monte carlo
-    predictions["Simulations"] = np.arange(1, 11) 
-    predictions["RMSE"] = np.around(RMSE_arr, decimals = 2)            #all rmses
-    predictions["R^2"] = np.around(R2_arr, decimals = 2)               #all r^2s
-    # monte_head = ["Simulation", "Root Mean Squared Error", "R² Score"]
-    #print(tabulate(predictions, headers=monte_head))
-    print("Average RMSE", predictions['RMSE'].mean())
-    RMSES.append(round(predictions['RMSE'].mean(), 2))
-    RMSE_SD.append(predictions['RMSE'].std())
-    print("Average R²", predictions['R^2'].mean())
-    R2S.append(round(predictions['R^2'].mean(), 3))
-    R2_SD.append(predictions['R^2'].std())
-# rfr_monte_carlo(X0, Y0)
-
 #Plot predictions 
 fig, axs = plt.subplots(2, 1)
 # Scatter plot for actual PP values
@@ -129,37 +101,73 @@ axs[1].legend(loc = 'upper right')
 plt.tight_layout()
 plt.show()
 
-#monthly sum of errors
-testing_months = df.loc[Y_test.index, 'month']
-residuals_df = pd.DataFrame({
-    'month': testing_months,
-    'error': error
-})
-monthly_error_sum = residuals_df.groupby('month')['error'].sum()
-plt.figure(figsize=(8, 5))
-plt.plot(monthly_error_sum.index, monthly_error_sum.values, marker='o', linestyle='-', color='yellowgreen')
-plt.xlabel('Month')
-plt.ylabel('Sum of Residuals (mgC/m³/day)')
-plt.xticks(range(1, 13))
-plt.show()
+#Monte Carlo simulation
+predictions = pd.DataFrame()
+rmses = []
+rmse_SD = []
+r2S = []
+r2_SD = []
+def rfr_monte_carlo(X, Y):
+    all_resid = []
+    month_resid = []
+    averages_arr = []
+    rmse_arr = []
+    R2_arr = []
+    for i in range(10):
+        X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=i) # split data
+        rfr = RandomForestRegressor(n_estimators=500, random_state=i, oob_score=True)
+        rfr.fit(X_train, Y_train)
+        Y_pred = rfr.predict(X_test)
+        #metrics
+        rmse_arr.append(math.sqrt(mean_squared_error(Y_test, Y_pred))) #arr of each rmse in one monte carlo
+        R2_arr.append(r2_score(Y_test, Y_pred))  
+        #residuals
+        resid_arr = Y_test - Y_pred #residual array
+        all_resid.append(resid_arr)
+        #monthly sum stuff
+        resid_arr.index = df.loc[Y_test.index, 'month'].values
+        month_resid.append(resid_arr)
+        averages = resid_arr.groupby(resid_arr.index).mean()
+        averages_arr.append(averages) #append monthly averages to list
+
+    month_resid = pd.concat(month_resid) #flatten into dataframe
+    monthly_average = month_resid.groupby(month_resid.index).mean()
+    monthly_avg_df = pd.DataFrame(averages_arr)
+    print('monthly average df', monthly_avg_df)
+    monthly_std = monthly_avg_df.std()
+    print('monthly std', monthly_std)
+
+    all_resid = np.concatenate(all_resid) #flatten array 
+    predictions["Simulations"] = np.arange(1, 11) 
+    predictions["RMSE"] = np.around(rmse_arr, decimals = 2)            #all rmses
+    predictions["R^2"] = np.around(R2_arr, decimals = 2)               #all r^2s
+    # monte_head = ["Simulation", "Root Mean Squared Error", "R² Score"]
+    #print(tabulate(predictions, headers=monte_head))
+    print("Average RMSE", predictions['RMSE'].mean())
+    rmses.append(predictions['RMSE'].mean())
+    rmse_SD.append(predictions['RMSE'].std())
+    print("Average R²", predictions['R^2'].mean())
+    r2S.append(round(predictions['R^2'].mean(), 2))
+    r2_SD.append(predictions['R^2'].std())
+    return all_resid, monthly_average, monthly_std
 
 #comparison bar-plot of r^2 and rmse
-categories = ["Set A", "Set B", "Set C", "Set D"]
-colors = ["#F4A261", "#f6da43", "#46cdb4", "#285f94"]    
-X_a = df_a.drop(columns = ['yymmdd', 'PP'])
-Y_a = df_a['PP']
-X_b = df_b.drop(columns = ['PP'])
-Y_b = df_b['PP']
+# categories = ["Set A", "Set B", "Set C", "Set D"]
+# colors = ["#F4A261", "#f6da43", "#46cdb4", "#285f94"]    
+# X_a = df_a.drop(columns = ['yymmdd', 'PP'])
+# Y_a = df_a['PP']
+# X_b = df_b.drop(columns = ['PP'])
+# Y_b = df_b['PP']
 X_c = df_c.drop(columns = ['PP'])
 Y_c = df_c['PP']
-X_d = df_d.drop(columns = ['PP'])
-Y_d = df_d['PP']
+# X_d = df_d.drop(columns = ['PP'])
+# Y_d = df_d['PP']
 # print('set A')
 # rfr_monte_carlo(X_a, Y_a)
 # print('\nset B')
 # rfr_monte_carlo(X_b, Y_b)
-# print('\nset C')
-# rfr_monte_carlo(X_c, Y_c)
+print('\nset C')
+all_resid, monthly_average, monthly_std = rfr_monte_carlo(X_c, Y_c)
 # print('\nset D')
 # rfr_monte_carlo(X_d, Y_d)
 
@@ -177,13 +185,19 @@ Y_d = df_d['PP']
 # plt.tight_layout()
 # plt.show()
 
-#residual histogram
+# residual histogram
 plt.figure(figsize=(8, 6))
-plt.hist(error, color='yellowgreen', bins=30, edgecolor='black', alpha=0.8)
-plt.xlabel('Residual')
+sns.histplot(all_resid, color='yellowgreen', bins=30, kde = True, alpha=0.8)
+plt.xlabel('Residual (mgC/m³/day)')
 plt.ylabel('Frequency')
 plt.show()
-
+#monthly sum of residuals lineplot
+plt.figure(figsize=(8, 5))
+plt.errorbar(monthly_average.index, monthly_average.values, yerr=monthly_std.values, fmt='o-', color='yellowgreen', ecolor='#c9e675', capsize=3)
+plt.xlabel('Month')
+plt.ylabel('Average Residuals (mgC/m³/day)')
+plt.xticks(range(1, 13))
+plt.show()
 
 # param_grid = {
 #     'n_estimators': [300, 500], 
