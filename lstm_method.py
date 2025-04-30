@@ -17,20 +17,17 @@ import matplotlib.pyplot as plt
 file_path = 'C:/Users/elain/OneDrive/Documents/Research - BATS/matched_data_from_BATS_trimmed.csv'
 df = pd.read_csv(file_path)
 df[df.columns[1:]] = df[df.columns[1:]].apply(pd.to_numeric, errors='coerce').astype('float64') #apply to everything except yymmdd
-df['yymmdd'] = pd.to_datetime(df['yymmdd']) 
-df['year'] = df['yymmdd'].dt.year
-df['month'] = df['yymmdd'].dt.month
-df['day'] = df['yymmdd'].dt.day
+df['yymmdd'] = pd.to_datetime(df['yymmdd']) # convert to date time
+df['year'] = df['yymmdd'].dt.year           # extract year
+df['month'] = df['yymmdd'].dt.month         # extract month
+df['day'] = df['yymmdd'].dt.day             # extract day
 df["sin_doy"] = np.sin(2 * np.pi * df["day_of_year"] / 365)
 df["cos_doy"] = np.cos(2 * np.pi * df["day_of_year"] / 365)
-# print(df.isnull().sum())
 
-# print("Number of rows in original dataset:", len(df))
+
+
 df_a = df
 df_a = df_a.dropna() #drop NaNs
-# df_a.to_csv('df_a.csv', index=False) 
-# print("Number of rows after dropping NaNs:", len(df_a))
-
 df_b = df[["year", "month", "day", "sin_doy", "cos_doy", "day_of_year", "Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "BAC", "PP"]]
 df_b = df_b.dropna() #drop NaNs
 df_c = df[["year", "month", "day", "sin_doy", "cos_doy", "day_of_year", "Depth", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "BAC", "PP"]]
@@ -40,8 +37,7 @@ df_d = df_d.dropna() #drop NaNs
 
 #chlorophyll
 df_a = df_a[df_a["Chl"] > -100] #drop weird chlorophylls
-# print('Number of rows after dropping weird chlorophylls:', len(df_a))
-df_b = df_b[df_b["Chl"] > -100] #drop NaNs
+df_b = df_b[df_b["Chl"] > -100] #drop weird chlorophylls
 
 def chauvenets_criterion(df, col_name): 
     data = df[col_name]
@@ -55,24 +51,20 @@ def chauvenets_criterion(df, col_name):
     return df[non_outliers]
 
 for i in range(4, df_a.shape[1]): df_a = chauvenets_criterion(df_a, df_a.columns[i])
-# print("Num rows in set A after removing outliers:", len(df_a))
 for i in range(4, df_b.shape[1]): df_b = chauvenets_criterion(df_b, df_b.columns[i])
-# print("Num rows in set B after removing outliers:", len(df_b))
 for i in range(4, df_c.shape[1]): df_c = chauvenets_criterion(df_c, df_c.columns[i])
-# print("Num rows in set C after removing outliers:", len(df_c))
 for i in range(4, df_d.shape[1]): df_d = chauvenets_criterion(df_d, df_d.columns[i])
-# print("Num rows in set D after removing outliers:", len(df_d))
 
-# #look at seasonality 
-# from statsmodels.tsa.seasonal import seasonal_decompose
-# df_pp = df = df.dropna(subset=['PP'])
-# results = seasonal_decompose(df_pp['PP'], model='additive', period=365)
-# fig = results.plot()
-# for ax in fig.axes:
-#     for line in ax.get_lines():
-#         line.set_linewidth(0.8)  
-#         line.set_markersize(1.5) 
-# plt.show()
+#look at seasonality 
+from statsmodels.tsa.seasonal import seasonal_decompose
+df_pp = df = df.dropna(subset=['PP'])
+results = seasonal_decompose(df_pp['PP'], model='additive', period=365)
+fig = results.plot()
+for ax in fig.axes:
+    for line in ax.get_lines():
+        line.set_linewidth(0.8)  
+        line.set_markersize(1.5) 
+plt.show()
 
 #plot histogram of PP
 # plt.figure(figsize=(10, 5))
@@ -84,7 +76,7 @@ scaler = MinMaxScaler()
 dfc_scaled = scaler.fit_transform(df_c)
 doy_values = df_c["day_of_year"].values[60:] 
 
-#sequences for LSTM
+#sequences for LSTM (need to better understand this)
 def create_sequences(data, seq_length):
     X, y = [], []
     for i in range(len(data) - seq_length):
@@ -92,12 +84,12 @@ def create_sequences(data, seq_length):
         y.append(data[i+seq_length, -1])     # target PP at t+1
     return np.array(X), np.array(y)
 
-seq_length = 60  # how many time steps the model will look at
+seq_length = 60  # how many time steps (30-360)
 
 X, y = create_sequences(dfc_scaled, seq_length)
 #split
-train_size = int(0.7 * len(X))
-val_size = int(0.15 * len(X))
+train_size = int(0.7 * len(X)) # first 70% is training
+val_size = int(0.15 * len(X))  # 70-85% is validation
 X_train = X[:train_size]
 y_train = y[:train_size]
 X_val = X[train_size:train_size + val_size]
@@ -107,6 +99,7 @@ y_test = y[train_size + val_size:]
 doy_test = doy_values[train_size + val_size:]
 print("X_train shape:", X_train.shape, "\nX_val shape:", X_val.shape, "\nX_test shape:", X_test.shape)
 #model
+#Need to tune layers and their parameters
 model = Sequential()
 model.add(LSTM(128, activation='tanh', return_sequences = False, input_shape=(X.shape[1], X.shape[2]))) #first layer
 # model.add(LSTM(64, activation='tanh', return_sequences = False)) #second layer
@@ -160,7 +153,7 @@ axs[1].legend(loc = 'upper right')
 plt.tight_layout()
 plt.show()
 
-
+# # if want average of 5 runs (cuz of variability)
 # for run in range(num_runs):
 #     print(f"Run {run+1}/{num_runs}")
 #     X, y = create_sequences(dfc_scaled, seq_length)

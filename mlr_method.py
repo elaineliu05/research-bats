@@ -14,29 +14,32 @@ from scipy.stats import norm
 file_path = 'C:/Users/elain/OneDrive/Documents/Research - BATS/matched_data_from_BATS_trimmed.csv'
 df = pd.read_csv(file_path)
 df[df.columns[1:]] = df[df.columns[1:]].apply(pd.to_numeric, errors='coerce').astype('float64') #apply to everything except yymmdd
+df['yymmdd'] = pd.to_datetime(df['yymmdd']) # convert to date time
+df['year'] = df['yymmdd'].dt.year           # extract year
+df['month'] = df['yymmdd'].dt.month         # extract month
+df['day'] = df['yymmdd'].dt.day             # extract day
 
-df['yymmdd'] = pd.to_datetime(df['yymmdd']) 
-df['year'] = df['yymmdd'].dt.year
-df['month'] = df['yymmdd'].dt.month
-df['day'] = df['yymmdd'].dt.day
-# df['day_of_year'] = df['yymmdd'].dt.dayofyear
-# df['PP'] = df['PP'] * 12 #converting from mmolC to mgC
+#set a: all variables available
 print("Number of rows in original dataset:", len(df))
 df_a = df
-df_a = df_a.dropna() #drop NaNs
+df_a = df_a.dropna()
 print("Number of rows after dropping NaNs:", len(df_a))
+#set b: variables not measured prior to 1994 removed (best results)
 df_b = df[["yymmdd", "year", "month", "day", "day_of_year", "Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "BAC", "PP"]]
-df_b = df_b.dropna() #drop NaNs
+df_b = df_b.dropna() 
+#set c: variables with consistent data
 df_c = df[["yymmdd", "year", "month", "day", "day_of_year", "Depth", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "BAC", "PP"]]
-df_c = df_c.dropna() #drop NaNs
+df_c = df_c.dropna()
+#set d: most common measurements
 df_d = df[["yymmdd", "year", "month", "day", "day_of_year", "Depth", "Temp", "O2", "NO3", "PO4", "PP"]]
-df_d = df_d.dropna() #drop NaNs
+df_d = df_d.dropna()
 
-
+#drop duplicates
 df_arr = [df_a, df_b, df_c, df_d]
 for i in range(len(df_arr)):
     df_arr[i] = df_arr[i].drop_duplicates(subset=['yymmdd', 'Depth'], keep='first') #drop duplicates
 
+#labels for graphs
 arr_names_pp_dfa = ["day_of_year", "Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "TOC", "TON", "TOP", "BAC", "PP"]
 arr_units_dfa = ["", " (m)", " (mg/m3)", " (C)", " (PSS-78)", " (umol/kg)"," (umol/kg)", " (umol/kg)", " (ug/kg)", " (ug/kg)", " (umol/kg)", " (umol/kg)", " (umol/kg)", " (nmol/kg)", " (cells*10^8/kg)", " (mgC/m³/day)"]
 names_units_dfa = [arr_names_pp + arr_units for arr_names_pp, arr_units in zip(arr_names_pp_dfa, arr_units_dfa)]
@@ -62,24 +65,18 @@ def chauvenets_criterion(df, col_name):
     non_outliers = probabilities >= criterion
     return df[non_outliers]
 
-for i in range(2, df_a.shape[1]):
-    df_a = chauvenets_criterion(df_a, df_a.columns[i])
-print("Number of rows in set A after removing outliers:", len(df_a))
-for i in range(2, df_b.shape[1]):
-    df_b = chauvenets_criterion(df_b, df_b.columns[i])
-print("Number of rows in set B after removing outliers:", len(df_b))
-for i in range(2, df_c.shape[1]):
-    df_c = chauvenets_criterion(df_c, df_c.columns[i])
-print("Number of rows in set C after removing outliers:", len(df_c))
-for i in range(2, df_d.shape[1]):
-    df_d = chauvenets_criterion(df_d, df_d.columns[i])
-print("Number of rows in set D after removing outliers:", len(df_d))
-
-print('describe', df_d['PP'].describe())
+for i in range(2, df_a.shape[1]): df_a = chauvenets_criterion(df_a, df_a.columns[i])
+print("Num rows in set A after removing outliers:", len(df_a))
+for i in range(2, df_b.shape[1]): df_b = chauvenets_criterion(df_b, df_b.columns[i])
+print("Num rows in set B after removing outliers:", len(df_b))
+for i in range(2, df_c.shape[1]): df_c = chauvenets_criterion(df_c, df_c.columns[i])
+print("Num rows in set C after removing outliers:", len(df_c))
+for i in range(2, df_d.shape[1]): df_d = chauvenets_criterion(df_d, df_d.columns[i])
+print("Num rows in set D after removing outliers:", len(df_d))
 
 def round_sig(x, sig=2):
     return round(x, sig - int(f"{x:.1e}".split("e")[1]))
-#Create subplot with each variable against PP with linear regression line
+#Linear regression subplots of each variable against PP
 fig, axs = plt.subplots(4, 4, figsize=(12, 7))
 axs = axs.ravel()
 arr_slopes = []
@@ -105,11 +102,13 @@ plt.show()
 #Multiple Linear Regression
 X = df_c[["day_of_year", "Depth", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "BAC"]]  # Predictors (Independent variables)
 Y = df_c['PP']                                                                              # Response (Dependent variable)
-X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=42) # split data
+#split data
+X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=42)
 # make model
 model = LinearRegression()
-model.fit(X_train, Y_train) # train model
-Y_pred = model.predict(X_test) # predict test data
+model.fit(X_train, Y_train)
+# predict
+Y_pred = model.predict(X_test) 
 # model evaluation
 print("Coefficients:", np.around(model.coef_, decimals = 3))
 print("Intercept:", model.intercept_)
@@ -123,20 +122,19 @@ axs[0].scatter(df.loc[Y_test.index, 'day_of_year'], Y_test, color='lightskyblue'
 axs[0].scatter(df.loc[Y_test.index, 'day_of_year'], Y_pred, color='salmon', label='Predicted PP', s=10)
 neg_acc = np.sum(Y_test < 0) 
 neg_pred = np.sum(Y_pred < 0)
-print("Percentage of negative values:", neg_acc / len(Y_test) * 100)
-print("Percentage of negative predictions:", neg_pred / len(Y_pred) * 100)
+print("Percent of negative values:", np.around((neg_acc / len(Y_test) * 100), decimals = 3))
+print("Percent of negative predictions:", neg_pred / len(Y_pred) * 100)
 axs[0].set_xlabel('Day of Year')
 axs[0].set_ylabel('Primary Productivity (mgC/m³/day)')
 axs[0].legend(loc = 'upper right')
-# Scatter plot for error
-error = Y_test - Y_pred
-axs[1].scatter(df.loc[Y_test.index, 'day_of_year'], error, color='darkslateblue', label='Error (Actual - Predicted)', s=10)
+# Scatter plot for residuals (test set)
+resid = Y_test - Y_pred
+axs[1].scatter(df.loc[Y_test.index, 'day_of_year'], resid, color='darkslateblue', label='Error (Actual - Predicted)', s=10)
 axs[1].set_xlabel('Day of Year')
 axs[1].set_ylabel('Error (mgC/m³/day)')
 axs[1].legend(loc = 'upper right')
 plt.tight_layout()
 plt.show()
-
 
 #Monte Carlo simulation
 predictions = pd.DataFrame()
@@ -155,17 +153,17 @@ def monte_carlo(X, Y):
         model = LinearRegression()
         model.fit(X_train, Y_train)
         Y_pred = model.predict(X_test)
-        #metrics
+        # metrics
         rmse_arr.append(math.sqrt(mean_squared_error(Y_test, Y_pred))) #arr of each rmse in one monte carlo
         R2_arr.append(r2_score(Y_test, Y_pred))  
-        #residuals
+        # residuals
         resid_arr = Y_test - Y_pred 
         all_resid.append(resid_arr)
-        #monthly sum stuff
+        # monthly sum stuff
         resid_arr.index = df.loc[Y_test.index, 'month'].values
         month_resid.append(resid_arr)
         averages = resid_arr.groupby(resid_arr.index).mean()
-        averages_arr.append(averages) #append monthly averages to list
+        averages_arr.append(averages)
     
     month_resid = pd.concat(month_resid) #flatten into dataframe
     monthly_average = month_resid.groupby(month_resid.index).mean()
@@ -175,13 +173,9 @@ def monte_carlo(X, Y):
     print('monthly std', monthly_std)
 
     all_resid = np.concatenate(all_resid) #flatten array 
-
     predictions["Simulations"] = np.arange(1, 11) 
-    predictions["RMSE"] = np.around(rmse_arr, decimals = 3)            #all rmses
-    predictions["R^2"] = np.around(R2_arr, decimals = 2)               #all r^2s
-    
-    # monte_head = ["Simulation", "Root Mean Squared Error", "R² Score"]
-    #print(tabulate(predictions, headers=monte_head))
+    predictions["RMSE"] = np.around(rmse_arr, decimals = 3) #all rmses
+    predictions["R^2"] = np.around(R2_arr, decimals = 2)    #all r^2s
     print("Average RMSE", predictions['RMSE'].mean())
     rmses.append(predictions['RMSE'].mean())
     rmse_SD.append(predictions['RMSE'].std())
@@ -191,8 +185,8 @@ def monte_carlo(X, Y):
     return all_resid, monthly_average, monthly_std
 
 #comparison bar-plot of r^2 and rmse
-# categories = ["Set A", "Set B", "Set C", "Set D"]
-# colors = ["#F4A261", "#f6da43", "#46cdb4", "#285f94"]    
+categories = ["Set A", "Set B", "Set C", "Set D"]
+colors = ["#F4A261", "#f6da43", "#46cdb4", "#285f94"]    
 # X_a = df_a[["day_of_year", "Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "TOC", "TON", "TOP", "BAC"]]
 # Y_a = df_a['PP']
 # X_b = df_b[["day_of_year", "Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "BAC"]]
@@ -231,26 +225,13 @@ sns.histplot(all_resid, color='royalblue', bins=30, kde = True, alpha=0.8)
 plt.xlabel('Residual  (mgC/m³/day)')
 plt.ylabel('Frequency')
 plt.show()
-
-#monthly sum of residuals lineplot
+# monthly sum of residuals lineplot
 plt.figure(figsize=(8, 5))
 plt.errorbar(monthly_average.index, monthly_average.values, yerr=monthly_std.values, fmt='o-', color='royalblue', ecolor='cornflowerblue', capsize=3)
 plt.xlabel('Month')
 plt.ylabel('Average Residuals (mgC/m³/day)')
 plt.xticks(range(1, 13))
 plt.show()
-
-# #property-property plot
-# plt.scatter(Y_test, Y_pred)
-# # 1:1 line (y = x)
-# min_val = min(min(Y_test), min(Y_pred))
-# max_val = max(max(Y_test), max(Y_pred))
-# plt.plot([min_val, max_val], [min_val, max_val], color='red', linestyle='--', label="1:1 Line")
-# plt.xlabel('Actual PP (mgC/m³/day)')
-# plt.ylabel('Predicted PP (mgC/m³/day)')
-# plt.title("Property-Property Plot of Predicted v Actual PP")
-# plt.tight_layout()
-# plt.show()
 
 #Multicollinearity
 # df_cut = df_a[["Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "TOC", "TON", "TOP", "BAC"]]
@@ -260,29 +241,6 @@ plt.show()
 # sns.heatmap(df_matrix, annot=True, cmap=custom_cmap, linewidths=0.1, cbar_kws={'label': 'Correlation Coefficient'}, center = 0, vmin=-1, vmax=1)
 # plt.show()
 # sns.pairplot(df_c[["Depth", "Chl", "Temp", "O2", "NO3", "PO4", "POC", "PON", "BAC"]], plot_kws={"s": 5})
-# plt.show()
-
-#Converting pp to mgC/m2/day
-# df_reorder = df_d #index 1 is row 4
-# dates = ['2007-07-19', '2007-08-17', '2007-12-06']
-
-# copy = df_reorder
-# for i in dates:
-#     # copy = copy[copy['yymmdd'] == i] 
-#     df_reorder = df_reorder[df_reorder['yymmdd'] == i].sort_values(by='Depth', ascending=True)
-#     # copy.update(copy_sorted)
-# df_reorder.to_csv('peek.csv', index=False) 
-
-# df_reorder['Depth_intervals'] = df_reorder.groupby('yymmdd')['Depth'].diff().fillna(1) #calculate depth intervals
-# df_reorder['PP_m2'] = (df_reorder['PP'] + df_reorder['PP'].shift(-1)) / 2 * df_reorder['Depth_intervals'] #trapezoidal integration method
-# df_reorder['PP_m2'] = df_reorder['PP_m2'].fillna(0)  # Handle NaN in the last interval
-# PP_m2_day = df_reorder.groupby('yymmdd')['PP_m2'].sum().reset_index() #adding up values for each day
-# df_reorder.to_csv('df_reordered.csv', index=False)
-# PP_m2_day.to_csv('peek.csv', index=False) 
-# plt.plot(PP_m2_day['yymmdd'], PP_m2_day['PP_m2'])
-# plt.ylim(0, 1200)
-# plt.xlabel('Date')
-# plt.ylabel('Primary Productivity (mgC/m2/day)')
 # plt.show()
 
 # #contour plot
@@ -305,11 +263,3 @@ plt.show()
 # plt.ylabel("Depth (m)")
 # plt.title("Time Series Contour Plot of Primary Productivity")
 # plt.show()
-
-# #Comparing MLR and linear reg 
-# slopes = pd.DataFrame()
-# slopes["Var"] = arr_names_pp[:-1]
-# slopes["MLR"] = model.coef_
-# slopes["LinReg"] = arr_slopes
-# slope_head = ["Var", "MLR", "LinReg"]
-# print(tabulate(slopes, headers=slope_head))

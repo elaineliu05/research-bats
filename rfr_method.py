@@ -10,28 +10,30 @@ from scipy.stats import norm
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.ensemble import RandomForestRegressor
+
 # Load dataset
 file_path = 'C:/Users/elain/OneDrive/Documents/Research - BATS/matched_data_from_BATS_trimmed.csv'
 df = pd.read_csv(file_path)
 df[df.columns[1:]] = df[df.columns[1:]].apply(pd.to_numeric, errors='coerce').astype('float64') #apply to everything except yymmdd
-df['yymmdd'] = pd.to_datetime(df['yymmdd']) 
-df['year'] = df['yymmdd'].dt.year
-df['month'] = df['yymmdd'].dt.month
-df['day'] = df['yymmdd'].dt.day
-print(df.isnull().sum())
+df['yymmdd'] = pd.to_datetime(df['yymmdd']) # convert to date time
+df['year'] = df['yymmdd'].dt.year           # extract year
+df['month'] = df['yymmdd'].dt.month         # extract month
+df['day'] = df['yymmdd'].dt.day             # extract day
 
+#set a: all variables available
 print("Number of rows in original dataset:", len(df))
 df_a = df
-df_a = df_a.dropna() #drop NaNs
-# df_a.to_csv('df_a.csv', index=False) 
+df_a = df_a.dropna()
 print("Number of rows after dropping NaNs:", len(df_a))
-
-df_b = df[["year", "month", "day", "day_of_year", "Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "BAC", "PP"]]
-df_b = df_b.dropna() #drop NaNs
-df_c = df[["year", "month", "day", "day_of_year", "Depth", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "BAC", "PP"]]
-df_c = df_c.dropna() #drop NaNs
-df_d = df[["year", "month", "day", "day_of_year", "Depth", "Temp", "O2", "NO3", "PO4", "PP"]]
-df_d = df_d.dropna() #drop NaNs
+#set b: variables not measured prior to 1994 removed (best results)
+df_b = df[["yymmdd", "year", "month", "day", "day_of_year", "Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "BAC", "PP"]]
+df_b = df_b.dropna() 
+#set c: variables with consistent data
+df_c = df[["yymmdd", "year", "month", "day", "day_of_year", "Depth", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "BAC", "PP"]]
+df_c = df_c.dropna()
+#set d: most common measurements
+df_d = df[["yymmdd", "year", "month", "day", "day_of_year", "Depth", "Temp", "O2", "NO3", "PO4", "PP"]]
+df_d = df_d.dropna()
 
 #chlorophyll
 df_a = df_a[df_a["Chl"] > -100] #drop weird chlorophylls
@@ -49,24 +51,24 @@ def chauvenets_criterion(df, col_name):
     non_outliers = probabilities >= criterion
     return df[non_outliers]
 
-for i in range(2, df_a.shape[1]):
-    df_a = chauvenets_criterion(df_a, df_a.columns[i])
-print("Number of rows in set A after removing outliers:", len(df_a))
-for i in range(2, df_b.shape[1]):
-    df_b = chauvenets_criterion(df_b, df_b.columns[i])
-print("Number of rows in set B after removing outliers:", len(df_b))
-for i in range(2, df_c.shape[1]):
-    df_c = chauvenets_criterion(df_c, df_c.columns[i])
-print("Number of rows in set C after removing outliers:", len(df_c))
-for i in range(2, df_d.shape[1]):
-    df_d = chauvenets_criterion(df_d, df_d.columns[i])
-print("Number of rows in set D after removing outliers:", len(df_d))
+for i in range(2, df_a.shape[1]): df_a = chauvenets_criterion(df_a, df_a.columns[i])
+print("Num rows in set A after removing outliers:", len(df_a))
+for i in range(2, df_b.shape[1]): df_b = chauvenets_criterion(df_b, df_b.columns[i])
+print("Num rows in set B after removing outliers:", len(df_b))
+for i in range(2, df_c.shape[1]): df_c = chauvenets_criterion(df_c, df_c.columns[i])
+print("Num rows in set C after removing outliers:", len(df_c))
+for i in range(2, df_d.shape[1]): df_d = chauvenets_criterion(df_d, df_d.columns[i])
+print("Num rows in set D after removing outliers:", len(df_d))
 
+#Random Forest Regression 
 X = df_c.drop(columns = ['PP'])  # Predictors (Independent variables)
 Y = df_c['PP'] 
+#split data
 X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=0) # split data
+# make model
 rfr = RandomForestRegressor(n_estimators=300, random_state=0, oob_score=True)
 rfr.fit(X_train, Y_train)
+#make predictions
 Y_pred = rfr.predict(X_test)
 
 print('first tree depth: ', rfr.estimators_[0].get_depth(), 'first tree leaves: ', rfr.estimators_[0].get_n_leaves())
@@ -141,8 +143,6 @@ def rfr_monte_carlo(X, Y):
     predictions["Simulations"] = np.arange(1, 11) 
     predictions["RMSE"] = np.around(rmse_arr, decimals = 2)            #all rmses
     predictions["R^2"] = np.around(R2_arr, decimals = 2)               #all r^2s
-    # monte_head = ["Simulation", "Root Mean Squared Error", "R² Score"]
-    #print(tabulate(predictions, headers=monte_head))
     print("Average RMSE", predictions['RMSE'].mean())
     rmses.append(predictions['RMSE'].mean())
     rmse_SD.append(predictions['RMSE'].std())
@@ -152,8 +152,8 @@ def rfr_monte_carlo(X, Y):
     return all_resid, monthly_average, monthly_std
 
 #comparison bar-plot of r^2 and rmse
-# categories = ["Set A", "Set B", "Set C", "Set D"]
-# colors = ["#F4A261", "#f6da43", "#46cdb4", "#285f94"]    
+categories = ["Set A", "Set B", "Set C", "Set D"]
+colors = ["#F4A261", "#f6da43", "#46cdb4", "#285f94"]    
 # X_a = df_a.drop(columns = ['yymmdd', 'PP'])
 # Y_a = df_a['PP']
 # X_b = df_b.drop(columns = ['PP'])
@@ -171,6 +171,7 @@ all_resid, monthly_average, monthly_std = rfr_monte_carlo(X_c, Y_c)
 # print('\nset D')
 # rfr_monte_carlo(X_d, Y_d)
 
+# # R^2 and RMSE bar chart
 # fig, axs = plt.subplots(1, 2, figsize = (7, 5), sharey=False)
 # axs[0].bar(categories, R2S, color=colors)
 # axs[0].errorbar(categories, R2S, yerr=R2_SD, fmt="o", color="k", capsize=3)
@@ -199,6 +200,7 @@ plt.ylabel('Average Residuals (mgC/m³/day)')
 plt.xticks(range(1, 13))
 plt.show()
 
+# # gridsearch for hyperparameter tuning
 # param_grid = {
 #     'n_estimators': [300, 500], 
 #     'max_depth': [15, 20],

@@ -24,28 +24,34 @@ from sklearn.model_selection import GridSearchCV
 file_path = 'C:/Users/elain/OneDrive/Documents/Research - BATS/matched_data_from_BATS_trimmed.csv'
 df = pd.read_csv(file_path)
 df[df.columns[1:]] = df[df.columns[1:]].apply(pd.to_numeric, errors='coerce').astype('float64') #apply to everything except yymmdd
-df['yymmdd'] = pd.to_datetime(df['yymmdd']) 
-df['year'] = df['yymmdd'].dt.year
-df['month'] = df['yymmdd'].dt.month
-df['day'] = df['yymmdd'].dt.day
-print(df.isnull().sum())
+df['yymmdd'] = pd.to_datetime(df['yymmdd']) # convert to date time
+df['year'] = df['yymmdd'].dt.year           # extract year
+df['month'] = df['yymmdd'].dt.month         # extract month
+df['day'] = df['yymmdd'].dt.day             # extract day
 
+#set a: all variables available
 print("Number of rows in original dataset:", len(df))
 df_a = df
-df_a = df_a.dropna() #drop NaNs
-# df_a.to_csv('df_a.csv', index=False) 
+df_a = df_a.dropna()
 print("Number of rows after dropping NaNs:", len(df_a))
+#set b: variables not measured prior to 1994 removed (best results)
+df_b = df[["yymmdd", "year", "month", "day", "day_of_year", "Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "BAC", "PP"]]
+df_b = df_b.dropna() 
+#set c: variables with consistent data
+df_c = df[["yymmdd", "year", "month", "day", "day_of_year", "Depth", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "BAC", "PP"]]
+df_c = df_c.dropna()
+#set d: most common measurements
+df_d = df[["yymmdd", "year", "month", "day", "day_of_year", "Depth", "Temp", "O2", "NO3", "PO4", "PP"]]
+df_d = df_d.dropna()
 
-df_b = df[["year", "month", "day", "day_of_year", "Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "BAC", "PP"]]
-df_b = df_b.dropna() #drop NaNs
-df_c = df[["year", "month", "day", "day_of_year", "Depth", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "BAC", "PP"]]
-df_c = df_c.dropna() #drop NaNs
-df_d = df[["year", "month", "day", "day_of_year", "Depth", "Temp", "O2", "NO3", "PO4", "PP"]]
-df_d = df_d.dropna() #drop NaNs
+#drop duplicates
+df_arr = [df_a, df_b, df_c, df_d]
+for i in range(len(df_arr)):
+    df_arr[i] = df_arr[i].drop_duplicates(subset=['yymmdd', 'Depth'], keep='first') #drop duplicates
 
 #chlorophyll
 df_a = df_a[df_a["Chl"] > -100] #drop weird chlorophylls
-print('Number of rows after dropping weird chlorophylls:', len(df_a))
+print('Num rows in set A after dropping weird chlorophylls:', len(df_a))
 df_b = df_b[df_b["Chl"] > -100] #drop NaNs
 
 def chauvenets_criterion(df, col_name): 
@@ -68,13 +74,18 @@ print("Num rows in set C after removing outliers:", len(df_c))
 for i in range(2, df_d.shape[1]): df_d = chauvenets_criterion(df_d, df_d.columns[i])
 print("Num rows in set D after removing outliers:", len(df_d))
 
+# XGBoost 
 X = df_c.drop(columns = ['PP'])  # Predictors (Independent variables)
 Y = df_c['PP'] 
+#split data
 X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=0) # split data
+# make model
 xgb_mod = xgb.XGBRegressor(n_estimators = 500, learning_rate = 0.1, max_depth = 10, min_child_weight = 5, subsample = 0.6, colsample_bytree = 0.8, gamma = 0, random_state = 0)
 xgb_mod.fit(X_train, Y_train)
+# predict
 Y_pred = xgb_mod.predict(X_test)
 
+# model evaluation
 mse = round(mean_squared_error(Y_test, Y_pred), 4)
 print("XGB Root mean squared error (RMSE): %.2f" % math.sqrt(mean_squared_error(Y_test, Y_pred)))
 r2 = round(r2_score(Y_test, Y_pred), 4)
@@ -141,12 +152,9 @@ def xgb_monte_carlo(X, Y):
     print('monthly std', monthly_std)
 
     all_resid = np.concatenate(all_resid) #flatten array 
-
     predictions["Simulations"] = np.arange(1, 11) 
     predictions["RMSE"] = np.around(rmse_arr, decimals = 3)            #all rmses
     predictions["R^2"] = np.around(R2_arr, decimals = 2)               #all r^2s
-    # monte_head = ["Simulation", "Root Mean Squared Error", "R² Score"]
-    #print(tabulate(predictions, headers=monte_head))
     print("Average RMSE", predictions['RMSE'].mean())
     xgb_rmses.append(round(predictions['RMSE'].mean(), 2))
     xgb_rmse_sd.append(predictions['RMSE'].std())
@@ -156,8 +164,8 @@ def xgb_monte_carlo(X, Y):
     return all_resid, monthly_average, monthly_std
 
 #comparison bar-plot of r^2 and rmse
-# sets = ["Set A", "Set B", "Set C", "Set D"]
-# colors = ["#F4A261", "#f6da43", "#46cdb4", "#285f94"]    
+sets = ["Set A", "Set B", "Set C", "Set D"]
+colors = ["#F4A261", "#f6da43", "#46cdb4", "#285f94"]    
 # X_a = df_a.drop(columns = ['yymmdd', 'PP'])
 # Y_a = df_a['PP']
 # X_b = df_b.drop(columns = ['PP'])
@@ -175,22 +183,22 @@ xgb_resid, xgb_monthly_avg, xgb_monthly_std = xgb_monte_carlo(X_c, Y_c)
 # print('\nset D')
 # xgb_monte_carlo(X_d, Y_d)
 
-# residual histogram
-plt.figure(figsize=(8, 6))
-sns.histplot(xgb_resid, color='gold', bins=30, kde = True, alpha=0.8)
-plt.xlabel('Residual  (mgC/m³/day)')
-plt.ylabel('Frequency')
-plt.show()
+# # residual histogram
+# plt.figure(figsize=(8, 6))
+# sns.histplot(xgb_resid, color='gold', bins=30, kde = True, alpha=0.8)
+# plt.xlabel('Residual  (mgC/m³/day)')
+# plt.ylabel('Frequency')
+# plt.show()
 
-#monthly sum of residuals lineplot
-plt.figure(figsize=(8, 5))
-plt.errorbar(xgb_monthly_avg.index, xgb_monthly_avg.values, yerr=xgb_monthly_std.values, fmt='o-', color='gold', ecolor='#fae97a', capsize=3)
-plt.xlabel('Month')
-plt.ylabel('Average Residuals (mgC/m³/day)')
-plt.xticks(range(1, 13))
-plt.show()
+# #monthly sum of residuals lineplot
+# plt.figure(figsize=(8, 5))
+# plt.errorbar(xgb_monthly_avg.index, xgb_monthly_avg.values, yerr=xgb_monthly_std.values, fmt='o-', color='gold', ecolor='#fae97a', capsize=3)
+# plt.xlabel('Month')
+# plt.ylabel('Average Residuals (mgC/m³/day)')
+# plt.xticks(range(1, 13))
+# plt.show()
 
-#compairson residual histogram
+#comparison residual histogram
 plt.figure(figsize=(10, 6))
 sns.histplot(mlr_resid, color='royalblue', label='MLR Residuals', bins=30, kde = True, alpha=0.85)
 sns.histplot(rfr_resid, color='yellowgreen', label='RFR Residuals', bins=30, kde = True, alpha=0.8)
@@ -212,6 +220,7 @@ plt.xticks(range(1, 13))
 plt.legend()
 plt.show()
 
+# XGB r^2 and rmse comparison bar graph
 # fig, axs = plt.subplots(1, 2, figsize = (7, 5), sharey=False)
 # axs[0].bar(sets, xgb_r2s, color=colors)
 # axs[0].errorbar(sets, xgb_r2s, yerr=xgb_r2_sd, fmt="o", color="k", capsize=3)
@@ -286,6 +295,7 @@ xgb_rmse_sd = [0.070, 0.142, 0.100, 0.130]
 # plt.ylim(0, 2.7)  # Adjust based on R² range
 # plt.show()
 
+# # grid search 
 # param_grid = {
 #     'n_estimators': [500, 700], 
 #     'learning_rate': [0.01, 0.05, 0.1],
