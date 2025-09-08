@@ -7,83 +7,28 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error, r2_score
 from scipy import stats
-from scipy.stats import norm
 
+#importing df sets
+df_a = pd.read_csv('C:/Users/elain/OneDrive/Documents/Research - BATS/df_sets/df_a.csv')
+df_b = pd.read_csv('C:/Users/elain/OneDrive/Documents/Research - BATS/df_sets/df_b.csv')
+df_c = pd.read_csv('C:/Users/elain/OneDrive/Documents/Research - BATS/df_sets/df_c.csv')
+df_d = pd.read_csv('C:/Users/elain/OneDrive/Documents/Research - BATS/df_sets/df_d.csv')
 
-# Load dataset
-file_path = 'C:/Users/elain/OneDrive/Documents/Research - BATS/matched_data_from_BATS_trimmed.csv'
-df = pd.read_csv(file_path)
-df[df.columns[1:]] = df[df.columns[1:]].apply(pd.to_numeric, errors='coerce').astype('float64') #apply to everything except yymmdd
-df['yymmdd'] = pd.to_datetime(df['yymmdd']) # convert to date time
-df['year'] = df['yymmdd'].dt.year           # extract year
-df['month'] = df['yymmdd'].dt.month         # extract month
-df['day'] = df['yymmdd'].dt.day             # extract day
-
-#set a: all variables available
-print("Number of rows in original dataset:", len(df))
-df_a = df
-df_a = df_a.dropna()
-print("Number of rows after dropping NaNs:", len(df_a))
-#set b: variables not measured prior to 1994 removed (best results)
-df_b = df[["yymmdd", "year", "month", "day", "day_of_year", "Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "BAC", "PP"]]
-df_b = df_b.dropna() 
-#set c: variables with consistent data
-df_c = df[["yymmdd", "year", "month", "day", "day_of_year", "Depth", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "BAC", "PP"]]
-df_c = df_c.dropna()
-#set d: most common measurements
-df_d = df[["yymmdd", "year", "month", "day", "day_of_year", "Depth", "Temp", "O2", "NO3", "PO4", "PP"]]
-df_d = df_d.dropna()
-
-#drop duplicates
-df_arr = [df_a, df_b, df_c, df_d]
-for i in range(len(df_arr)):
-    df_arr[i] = df_arr[i].drop_duplicates(subset=['yymmdd', 'Depth'], keep='first') #drop duplicates
-
-#labels for graphs
-arr_names_pp_dfa = ["day_of_year", "Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "TOC", "TON", "TOP", "BAC", "PP"]
-arr_units_dfa = ["", " (m)", " (mg/m3)", " (C)", " (PSS-78)", " (umol/kg)"," (umol/kg)", " (umol/kg)", " (ug/kg)", " (ug/kg)", " (umol/kg)", " (umol/kg)", " (umol/kg)", " (nmol/kg)", " (cells*10^8/kg)", " (mgC/m³/day)"]
-names_units_dfa = [arr_names_pp + arr_units for arr_names_pp, arr_units in zip(arr_names_pp_dfa, arr_units_dfa)]
-
-#Chlorophyll
-df_a = df_a[df_a["Chl"] > -100] #drop NaNs
-df_b = df_b[df_b["Chl"] > -100] #drop NaNs
-# plt.scatter(df["yymmdd"], df["Chl"], s=5)
-# plt.xlabel('time')
-# plt.ylabel('Chl mg/m3')
-# plt.tight_layout()
-# plt.show()
-
-# Remove outliers using Chauvenet's criterion
-def chauvenets_criterion(df, col_name): 
-    data = df[col_name]
-    mean = np.mean(data)
-    std = np.std(data)
-    deviations = np.abs(data - mean)/std
-    n = len(data)
-    probabilities = 1 - norm.cdf(deviations)
-    criterion = 1.0/(2*n)
-    non_outliers = probabilities >= criterion
-    return df[non_outliers]
-
-for i in range(2, df_a.shape[1]): df_a = chauvenets_criterion(df_a, df_a.columns[i])
-print("Num rows in set A after removing outliers:", len(df_a))
-for i in range(2, df_b.shape[1]): df_b = chauvenets_criterion(df_b, df_b.columns[i])
-print("Num rows in set B after removing outliers:", len(df_b))
-for i in range(2, df_c.shape[1]): df_c = chauvenets_criterion(df_c, df_c.columns[i])
-print("Num rows in set C after removing outliers:", len(df_c))
-for i in range(2, df_d.shape[1]): df_d = chauvenets_criterion(df_d, df_d.columns[i])
-print("Num rows in set D after removing outliers:", len(df_d))
+arr_names = ["day_of_year", "Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "TOC", "TON", "TOP", "BAC", "PP"]
+arr_units =  ["", " (m)", " (mg/m3)", " (C)", " (PSS-78)", " (umol/kg)"," (umol/kg)", " (umol/kg)", " (ug/kg)", " (ug/kg)", " (umol/kg)", " (umol/kg)", " (umol/kg)", " (nmol/kg)", " (cells*10^8/kg)", " (mgC/m³/day)"]
+names_units = [arr_names_pp + arr_units for arr_names_pp, arr_units in zip(arr_names, arr_units)]
 
 def round_sig(x, sig=2):
     return round(x, sig - int(f"{x:.1e}".split("e")[1]))
+
 #Linear regression subplots of each variable against PP
 fig, axs = plt.subplots(4, 4, figsize=(12, 7))
 axs = axs.ravel()
 arr_slopes = []
-for i in range(len(arr_names_pp_dfa) - 1):
-    x= df_a[arr_names_pp_dfa[i]]
+for i in range(len(arr_names) - 1):
+    x= df_a[arr_names[i]]
     axs[i].scatter(x, df_a['PP'], s=5, linewidths=1)
-    axs[i].set_xlabel(names_units_dfa[i]), axs[i].set_ylabel('PP (mgC/m³/day)') 
+    axs[i].set_xlabel(names_units[i]), axs[i].set_ylabel('PP (mgC/m³/day)') 
     axs[i].set_xlim(x.min(), x.max()), axs[i].set_ylim(-0.1)
     m, b, r_value, p_value, std_err = stats.linregress(x, df_a["PP"])
     arr_slopes.append(m)
@@ -99,9 +44,12 @@ for i in range(len(arr_names_pp_dfa) - 1):
 plt.tight_layout()
 plt.show()
 
+# choose df set
+my_df = df_c
+
 #Multiple Linear Regression
-X = df_c[["day_of_year", "Depth", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "BAC"]]  # Predictors (Independent variables)
-Y = df_c['PP']                                                                              # Response (Dependent variable)
+X = my_df[["day_of_year", "Depth", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "BAC"]]  # Predictors (Independent variables)
+Y = my_df['PP']                                                                              # Response (Dependent variable)
 #split data
 X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=42)
 # make model
@@ -110,26 +58,26 @@ model.fit(X_train, Y_train)
 # predict
 Y_pred = model.predict(X_test) 
 # model evaluation
-print("Coefficients:", np.around(model.coef_, decimals = 3))
-print("Intercept:", model.intercept_)
-print("Root mean squared error (RMSE): %.2f" % math.sqrt(mean_squared_error(Y_test, Y_pred)))
-print("R² score: %.2f" % r2_score(Y_test, Y_pred), end="\n")
+print("MLR Coefficients:", np.around(model.coef_, decimals = 3))
+print("MLR Intercept:", model.intercept_)
+print("MLR Root mean squared error (RMSE): %.2f" % math.sqrt(mean_squared_error(Y_test, Y_pred)))
+print("MLR R² score: %.2f" % r2_score(Y_test, Y_pred), end="\n")
 
 #Plot predictions 
 fig, axs = plt.subplots(2, 1)
 # Scatter plot for actual PP values
-axs[0].scatter(df.loc[Y_test.index, 'day_of_year'], Y_test, color='lightskyblue', label='Actual PP', s=10)
-axs[0].scatter(df.loc[Y_test.index, 'day_of_year'], Y_pred, color='salmon', label='Predicted PP', s=10)
+axs[0].scatter(my_df.loc[Y_test.index, 'day_of_year'], Y_test, color='lightskyblue', label='Actual PP', s=10)
+axs[0].scatter(my_df.loc[Y_test.index, 'day_of_year'], Y_pred, color='salmon', label='Predicted PP', s=10)
 neg_acc = np.sum(Y_test < 0) 
 neg_pred = np.sum(Y_pred < 0)
-print("Percent of negative values:", np.around((neg_acc / len(Y_test) * 100), decimals = 3))
-print("Percent of negative predictions:", neg_pred / len(Y_pred) * 100)
+print("MLR Percent of negative values:", np.around((neg_acc / len(Y_test) * 100), decimals = 3))
+print("MLR Percent of negative predictions:", neg_pred / len(Y_pred) * 100)
 axs[0].set_xlabel('Day of Year')
 axs[0].set_ylabel('Primary Productivity (mgC/m³/day)')
 axs[0].legend(loc = 'upper right')
 # Scatter plot for residuals (test set)
 resid = Y_test - Y_pred
-axs[1].scatter(df.loc[Y_test.index, 'day_of_year'], resid, color='darkslateblue', label='Error (Actual - Predicted)', s=10)
+axs[1].scatter(my_df.loc[Y_test.index, 'day_of_year'], resid, color='darkslateblue', label='Error (Actual - Predicted)', s=10)
 axs[1].set_xlabel('Day of Year')
 axs[1].set_ylabel('Error (mgC/m³/day)')
 axs[1].legend(loc = 'upper right')
@@ -142,7 +90,7 @@ rmses = []
 rmse_SD = []
 r2S = []
 r2_SD = []
-def monte_carlo(X, Y):
+def mlr_monte_carlo(X, Y):
     all_resid = []
     month_resid = []
     averages_arr = []
@@ -160,7 +108,7 @@ def monte_carlo(X, Y):
         resid_arr = Y_test - Y_pred 
         all_resid.append(resid_arr)
         # monthly sum stuff
-        resid_arr.index = df.loc[Y_test.index, 'month'].values
+        resid_arr.index = my_df.loc[Y_test.index, 'month'].values
         month_resid.append(resid_arr)
         averages = resid_arr.groupby(resid_arr.index).mean()
         averages_arr.append(averages)
@@ -168,18 +116,16 @@ def monte_carlo(X, Y):
     month_resid = pd.concat(month_resid) #flatten into dataframe
     monthly_average = month_resid.groupby(month_resid.index).mean()
     monthly_avg_df = pd.DataFrame(averages_arr)
-    print('monthly average df', monthly_avg_df)
     monthly_std = monthly_avg_df.std()
-    print('monthly std', monthly_std)
 
     all_resid = np.concatenate(all_resid) #flatten array 
     predictions["Simulations"] = np.arange(1, 11) 
     predictions["RMSE"] = np.around(rmse_arr, decimals = 3) #all rmses
     predictions["R^2"] = np.around(R2_arr, decimals = 2)    #all r^2s
-    print("Average RMSE", predictions['RMSE'].mean())
+    print("MLR Average RMSE", predictions['RMSE'].mean())
     rmses.append(predictions['RMSE'].mean())
     rmse_SD.append(predictions['RMSE'].std())
-    print("Average R²", predictions['R^2'].mean())
+    print("MLR Average R²", predictions['R^2'].mean())
     r2S.append(round(predictions['R^2'].mean(), 2))
     r2_SD.append(predictions['R^2'].std())
     return all_resid, monthly_average, monthly_std
@@ -187,22 +133,22 @@ def monte_carlo(X, Y):
 #comparison bar-plot of r^2 and rmse
 categories = ["Set A", "Set B", "Set C", "Set D"]
 colors = ["#F4A261", "#f6da43", "#46cdb4", "#285f94"]    
-# X_a = df_a[["day_of_year", "Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "TOC", "TON", "TOP", "BAC"]]
-# Y_a = df_a['PP']
-# X_b = df_b[["day_of_year", "Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "BAC"]]
-# Y_b = df_b['PP']
-X_c = df_c[["day_of_year", "Depth", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "BAC"]]
-Y_c = df_c['PP']
-# X_d = df_d[["day_of_year", "Depth", "Temp", "O2", "NO3", "PO4"]]
-# Y_d = df_d['PP']
-# print('set A')
-# monte_carlo(X_a, Y_a)
-# print('\nset B')
-# monte_carlo(X_b, Y_b)
-print('\nset C')
-all_resid, monthly_average, monthly_std = monte_carlo(X_c, Y_c)
-# print('\nset D')
-# monte_carlo(X_d, Y_d)
+if (my_df.equals(df_a)):
+    X_a = df_a[["day_of_year", "Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "TOC", "TON", "TOP", "BAC"]]
+    Y_a = df_a['PP']
+    all_resid, monthly_average, monthly_std = mlr_monte_carlo(X_a, Y_a)
+elif (my_df.equals(df_b)):
+    X_b = df_b[["day_of_year", "Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "BAC"]]
+    Y_b = df_b['PP']
+    all_resid, monthly_average, monthly_std = mlr_monte_carlo(X_b, Y_b)
+elif (my_df.equals(df_c)):
+    X_c = df_c[["day_of_year", "Depth", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "BAC"]]
+    Y_c = df_c['PP']
+    all_resid, monthly_average, monthly_std = mlr_monte_carlo(X_c, Y_c)
+elif (my_df.equals(df_d)):
+    X_d = df_d[["day_of_year", "Depth", "Temp", "O2", "NO3", "PO4"]]
+    Y_d = df_d['PP']
+    all_resid, monthly_average, monthly_std = mlr_monte_carlo(X_d, Y_d)
 
 # # R^2 and RMSE bar chart
 # fig, axs = plt.subplots(1, 2, figsize = (7, 5), sharey=False)

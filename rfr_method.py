@@ -11,92 +11,52 @@ from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.ensemble import RandomForestRegressor
 
-# Load dataset
-file_path = 'C:/Users/elain/OneDrive/Documents/Research - BATS/matched_data_from_BATS_trimmed.csv'
-df = pd.read_csv(file_path)
-df[df.columns[1:]] = df[df.columns[1:]].apply(pd.to_numeric, errors='coerce').astype('float64') #apply to everything except yymmdd
-df['yymmdd'] = pd.to_datetime(df['yymmdd']) # convert to date time
-df['year'] = df['yymmdd'].dt.year           # extract year
-df['month'] = df['yymmdd'].dt.month         # extract month
-df['day'] = df['yymmdd'].dt.day             # extract day
+# importing df sets
+df_a = pd.read_csv('C:/Users/elain/OneDrive/Documents/Research - BATS/df_sets/df_a.csv')
+df_b = pd.read_csv('C:/Users/elain/OneDrive/Documents/Research - BATS/df_sets/df_b.csv')
+df_c = pd.read_csv('C:/Users/elain/OneDrive/Documents/Research - BATS/df_sets/df_c.csv')
+df_d = pd.read_csv('C:/Users/elain/OneDrive/Documents/Research - BATS/df_sets/df_d.csv')
 
-#set a: all variables available
-print("Number of rows in original dataset:", len(df))
-df_a = df
-df_a = df_a.dropna()
-print("Number of rows after dropping NaNs:", len(df_a))
-#set b: variables not measured prior to 1994 removed (best results)
-df_b = df[["yymmdd", "year", "month", "day", "day_of_year", "Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "BAC", "PP"]]
-df_b = df_b.dropna() 
-#set c: variables with consistent data
-df_c = df[["yymmdd", "year", "month", "day", "day_of_year", "Depth", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "BAC", "PP"]]
-df_c = df_c.dropna()
-#set d: most common measurements
-df_d = df[["yymmdd", "year", "month", "day", "day_of_year", "Depth", "Temp", "O2", "NO3", "PO4", "PP"]]
-df_d = df_d.dropna()
+# choose df set
+my_df = df_c 
 
-#chlorophyll
-df_a = df_a[df_a["Chl"] > -100] #drop weird chlorophylls
-print('Number of rows after dropping weird chlorophylls:', len(df_a))
-df_b = df_b[df_b["Chl"] > -100] #drop NaNs
-
-def chauvenets_criterion(df, col_name): 
-    data = df[col_name]
-    mean = np.mean(data)
-    std = np.std(data)
-    deviations = np.abs(data - mean)/std
-    n = len(data)
-    probabilities = 1 - norm.cdf(deviations)
-    criterion = 1.0/(2*n)
-    non_outliers = probabilities >= criterion
-    return df[non_outliers]
-
-for i in range(2, df_a.shape[1]): df_a = chauvenets_criterion(df_a, df_a.columns[i])
-print("Num rows in set A after removing outliers:", len(df_a))
-for i in range(2, df_b.shape[1]): df_b = chauvenets_criterion(df_b, df_b.columns[i])
-print("Num rows in set B after removing outliers:", len(df_b))
-for i in range(2, df_c.shape[1]): df_c = chauvenets_criterion(df_c, df_c.columns[i])
-print("Num rows in set C after removing outliers:", len(df_c))
-for i in range(2, df_d.shape[1]): df_d = chauvenets_criterion(df_d, df_d.columns[i])
-print("Num rows in set D after removing outliers:", len(df_d))
-
-#Random Forest Regression 
-X = df_c.drop(columns = ['PP'])  # Predictors (Independent variables)
-Y = df_c['PP'] 
-#split data
+# Random Forest Regression 
+X = my_df.drop(columns = ['PP', 'yymmdd'])  # drop PP bc were predicting, drop yymmdd bc it is datetime
+Y = my_df['PP'] 
+# split data
 X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=0) # split data
 # make model
 rfr = RandomForestRegressor(n_estimators=300, random_state=0, oob_score=True)
 rfr.fit(X_train, Y_train)
-#make predictions
+# make predictions
 Y_pred = rfr.predict(X_test)
 
 print('first tree depth: ', rfr.estimators_[0].get_depth(), 'first tree leaves: ', rfr.estimators_[0].get_n_leaves())
 print('last tree depth: ', rfr.estimators_[-1].get_depth(), 'last tree leaves: ', rfr.estimators_[-1].get_n_leaves())
 
 mse = round(mean_squared_error(Y_test, Y_pred), 4)
-print("Root mean squared error (RMSE): %.2f" % math.sqrt(mean_squared_error(Y_test, Y_pred)))
+print("RFR Root mean squared error (RMSE): %.2f" % math.sqrt(mean_squared_error(Y_test, Y_pred)))
 r2 = round(r2_score(Y_test, Y_pred), 4)
-print(f'R-squared: {r2}')
+print(f'RFR R-squared: {r2}')
 feature_importances = rfr.feature_importances_
 feature_importances = [round(importance, 4) for importance in feature_importances]
-print(f'Feature importances: {feature_importances}')
+print(f'RFR Feature importances: {feature_importances}')
 
 #Plot predictions 
 fig, axs = plt.subplots(2, 1)
 # Scatter plot for actual PP values
-axs[0].scatter(df.loc[Y_test.index, 'day_of_year'], Y_test, color='lightskyblue', label='Actual PP', s=10)
-axs[0].scatter(df.loc[Y_test.index, 'day_of_year'], Y_pred, color='salmon', label='Predicted PP', s=10)
+axs[0].scatter(my_df.loc[Y_test.index, 'day_of_year'], Y_test, color='lightskyblue', label='Actual PP', s=10)
+axs[0].scatter(my_df.loc[Y_test.index, 'day_of_year'], Y_pred, color='salmon', label='Predicted PP', s=10)
 neg_acc = np.sum(Y_test < 0) 
 neg_pred = np.sum(Y_pred < 0)
-print("Percentage of negative values:", neg_acc / len(Y_test) * 100)
-print("Percentage of negative predictions:", neg_pred / len(Y_pred) * 100)
+print("RFR Percentage of negative values:", neg_acc / len(Y_test) * 100)
+print("RFR Percentage of negative predictions:", neg_pred / len(Y_pred) * 100)
 axs[0].set_xlabel('Day of Year')
 axs[0].set_ylabel('Primary Productivity (mgC/m³/day)')
 axs[0].legend(loc = 'upper right')
 # Scatter plot for error
 error = Y_test - Y_pred
-axs[1].scatter(df.loc[Y_test.index, 'day_of_year'], error, color='darkslateblue', label='Error (Actual - Predicted)', s=10)
+axs[1].scatter(my_df.loc[Y_test.index, 'day_of_year'], error, color='darkslateblue', label='Error (Actual - Predicted)', s=10)
 axs[1].set_xlabel('Day of Year')
 axs[1].set_ylabel('Error (mgC/m³/day)')
 axs[1].legend(loc = 'upper right')
@@ -127,7 +87,7 @@ def rfr_monte_carlo(X, Y):
         resid_arr = Y_test - Y_pred #residual array
         all_resid.append(resid_arr)
         #monthly sum stuff
-        resid_arr.index = df.loc[Y_test.index, 'month'].values
+        resid_arr.index = my_df.loc[Y_test.index, 'month'].values
         month_resid.append(resid_arr)
         averages = resid_arr.groupby(resid_arr.index).mean()
         averages_arr.append(averages) #append monthly averages to list
@@ -153,23 +113,23 @@ def rfr_monte_carlo(X, Y):
 
 #comparison bar-plot of r^2 and rmse
 categories = ["Set A", "Set B", "Set C", "Set D"]
-colors = ["#F4A261", "#f6da43", "#46cdb4", "#285f94"]    
-# X_a = df_a.drop(columns = ['yymmdd', 'PP'])
-# Y_a = df_a['PP']
-# X_b = df_b.drop(columns = ['PP'])
-# Y_b = df_b['PP']
-X_c = df_c.drop(columns = ['PP'])
-Y_c = df_c['PP']
-# X_d = df_d.drop(columns = ['PP'])
-# Y_d = df_d['PP']
-# print('set A')
-# rfr_monte_carlo(X_a, Y_a)
-# print('\nset B')
-# rfr_monte_carlo(X_b, Y_b)
-print('\nset C')
-all_resid, monthly_average, monthly_std = rfr_monte_carlo(X_c, Y_c)
-# print('\nset D')
-# rfr_monte_carlo(X_d, Y_d)
+colors = ["#F4A261", "#f6da43", "#46cdb4", "#285f94"]  
+if (my_df.equals(df_a)):
+    X_a = df_a.drop(columns = ['PP', 'yymmdd'])
+    Y_a = df_a['PP']
+    all_resid, monthly_average, monthly_std = rfr_monte_carlo(X_a, Y_a)
+elif (my_df.equals(df_b)):
+    X_b = df_b.drop(columns = ['PP', 'yymmdd'])
+    Y_b = df_b['PP']
+    all_resid, monthly_average, monthly_std = rfr_monte_carlo(X_b, Y_b)
+elif (my_df.equals(df_c)):
+    X_c = df_c.drop(columns = ['PP', 'yymmdd'])
+    Y_c = df_c['PP']
+    all_resid, monthly_average, monthly_std = rfr_monte_carlo(X_c, Y_c)
+elif (my_df.equals(df_d)):
+    X_d = df_d.drop(columns = ['PP', 'yymmdd'])
+    Y_d = df_d['PP']
+    all_resid, monthly_average, monthly_std = rfr_monte_carlo(X_d, Y_d)
 
 # # R^2 and RMSE bar chart
 # fig, axs = plt.subplots(1, 2, figsize = (7, 5), sharey=False)
