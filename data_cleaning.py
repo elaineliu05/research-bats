@@ -23,8 +23,8 @@ df = orig_df[["yymmdd", "day_of_year", "Depth", "Chl", "Temp", "Sal", "O2", "NO3
 df['year'] = df['yymmdd'].dt.year           # extract year
 df['month'] = df['yymmdd'].dt.month         # extract month
 df['day'] = df['yymmdd'].dt.day             # extract day
-df["sin_doy"] = np.sin(2 * np.pi * df["day_of_year"] / 365)
-df["cos_doy"] = np.cos(2 * np.pi * df["day_of_year"] / 365)
+# df["sin_doy"] = np.sin(2 * np.pi * df["day_of_year"] / 365)
+# df["cos_doy"] = np.cos(2 * np.pi * df["day_of_year"] / 365)
 df.to_csv('matched_data_from_BATS_trimmed.csv', index=False) 
 
 #naming variables and units
@@ -63,27 +63,27 @@ def chauvenets_criterion(df, col_name):
 
 # selecting variable sets
 #set a: all variables available
-df_a = df[["year", "month", "day", "day_of_year", "sin_doy", "cos_doy", "Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "TOC", "TON", "TOP", "BAC", "PP"]]
+df_a = df
 df_a = df_a.dropna()
 #set b: variables not measured prior to 1994 removed (best results)
-df_b = df[["year", "month", "day", "day_of_year", "sin_doy", "cos_doy", "Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "BAC", "PP"]]
+df_b = df[["yymmdd", "year", "month", "day", "day_of_year", "Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "BAC", "PP"]]
 df_b = df_b.dropna() 
 #set c: variables with consistent data
-df_c = df[["year", "month", "day", "day_of_year", "sin_doy", "cos_doy", "Depth", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "BAC", "PP"]]
+df_c = df[["yymmdd", "year", "month", "day", "day_of_year", "Depth", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "BAC", "PP"]]
 df_c = df_c.dropna()
 #set d: most common measurements
-df_d = df[["year", "month", "day", "day_of_year", "sin_doy", "cos_doy", "Depth", "Temp", "O2", "NO3", "PO4", "PP"]]
+df_d = df[["yymmdd", "year", "month", "day", "day_of_year", "Depth", "Temp", "O2", "NO3", "PO4", "PP"]]
 df_d = df_d.dropna()
 
 # applying chauvenet to all dfs
-# start at column 7 (Depth) to avoid date columns
-for i in range(7, df_a.shape[1]): df_a = chauvenets_criterion(df_a, df_a.columns[i])
+# start at column 6 (Depth) to avoid date columns
+for i in range(6, df_a.shape[1]): df_a = chauvenets_criterion(df_a, df_a.columns[i])
 print("Num rows in set A after removing outliers:", len(df_a))
-for i in range(7, df_b.shape[1]): df_b = chauvenets_criterion(df_b, df_b.columns[i])
+for i in range(6, df_b.shape[1]): df_b = chauvenets_criterion(df_b, df_b.columns[i])
 print("Num rows in set B after removing outliers:", len(df_b))
-for i in range(7, df_c.shape[1]): df_c = chauvenets_criterion(df_c, df_c.columns[i])
+for i in range(6, df_c.shape[1]): df_c = chauvenets_criterion(df_c, df_c.columns[i])
 print("Num rows in set C after removing outliers:", len(df_c))
-for i in range(7, df_d.shape[1]): df_d = chauvenets_criterion(df_d, df_d.columns[i])
+for i in range(6, df_d.shape[1]): df_d = chauvenets_criterion(df_d, df_d.columns[i])
 print("Num rows in set D after removing outliers:", len(df_d))
 
 # exporting dataframes
@@ -91,7 +91,3 @@ df_a.to_csv('df_a.csv', index=False)
 df_b.to_csv('df_b.csv', index=False) 
 df_c.to_csv('df_c.csv', index=False) 
 df_d.to_csv('df_d.csv', index=False) 
-
-neg = np.sum(df['PP'] < 0) 
-print("Percent of negative PP values:", np.around((neg / len(df) * 100), decimals = 3))
-print("Number of negative PP values:", neg, 'out of total rows:', len(df))

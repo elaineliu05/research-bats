@@ -5,9 +5,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
+from sklearn.metrics import mean_squared_error, r2_score
 from scipy import stats
-from sklearn.preprocessing import StandardScaler
 
 #importing df sets
 df_a = pd.read_csv('C:/Users/elain/OneDrive/Documents/Research - BATS/df_sets/df_a.csv')
@@ -15,8 +14,8 @@ df_b = pd.read_csv('C:/Users/elain/OneDrive/Documents/Research - BATS/df_sets/df
 df_c = pd.read_csv('C:/Users/elain/OneDrive/Documents/Research - BATS/df_sets/df_c.csv')
 df_d = pd.read_csv('C:/Users/elain/OneDrive/Documents/Research - BATS/df_sets/df_d.csv')
 
-arr_names = ["sin_doy", "cos_doy", "Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "TOC", "TON", "TOP", "BAC", "PP"]
-arr_units =  ["", "", " (m)", " (mg/m3)", " (C)", " (PSS-78)", " (umol/kg)"," (umol/kg)", " (umol/kg)", " (ug/kg)", " (ug/kg)", " (umol/kg)", " (umol/kg)", " (umol/kg)", " (nmol/kg)", " (cells*10^8/kg)", " (mgC/m³/day)"]
+arr_names = ["day_of_year", "Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "TOC", "TON", "TOP", "BAC", "PP"]
+arr_units =  ["", " (m)", " (mg/m3)", " (C)", " (PSS-78)", " (umol/kg)"," (umol/kg)", " (umol/kg)", " (ug/kg)", " (ug/kg)", " (umol/kg)", " (umol/kg)", " (umol/kg)", " (nmol/kg)", " (cells*10^8/kg)", " (mgC/m³/day)"]
 names_units = [arr_names_pp + arr_units for arr_names_pp, arr_units in zip(arr_names, arr_units)]
 
 def round_sig(x, sig=2):
@@ -49,42 +48,20 @@ plt.show()
 my_df = df_c
 
 #Multiple Linear Regression
-X = my_df.drop(columns = ['PP', 'day_of_year'])  # drop PP bc were predicting, day of year is not cyclical
-Y = my_df['PP']                   # Response (Dependent variable)
-#forecasting split
-test_size = int(0.15 * len(my_df)) 
-X_trainval, X_test = X[:-test_size], X[-test_size:]
-Y_trainval, Y_test = Y[:-test_size], Y[-test_size:]
-X_train, X_val, Y_train, Y_val = train_test_split(X_trainval, Y_trainval, test_size=0.176, random_state=42) # 0.176 x 0.85 = 0.15 for val
-# X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=0) # split data
-scaler = StandardScaler()
-X_train_scaled = scaler.fit_transform(X_train)   # fit on train only
-X_val_scaled = scaler.transform(X_val)
-X_test_scaled = scaler.transform(X_test) 
-
+X = my_df[["day_of_year", "Depth", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "BAC"]]  # Predictors (Independent variables)
+Y = my_df['PP']                                                                              # Response (Dependent variable)
+#split data
+X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=42)
 # make model
 model = LinearRegression()
-model.fit(X_train_scaled, Y_train)
-
+model.fit(X_train, Y_train)
 # predict
-Y_val_pred = model.predict(X_val_scaled)
-Y_pred = model.predict(X_test_scaled) 
-
+Y_pred = model.predict(X_test) 
 # model evaluation
-def evaluate(y_true, y_pred, name=""):
-    rmse = math.sqrt(mean_squared_error(y_true, y_pred))
-    r2 = r2_score(y_true, y_pred)
-    mae = mean_absolute_error(y_true, y_pred)
-    print(f"MLR {name} R²: {r2:.3f}, RMSE: {rmse:.3f}, MAE: {mae:.3f}")
-    return r2
-
-evaluate(Y_val, Y_val_pred, "Validation")
-evaluate(Y_test, Y_pred, "Test")
-# print("MLR Coefficients:", np.around(model.coef_, decimals = 3))
-# print("MLR Intercept:", model.intercept_)
-# print("MLR Root mean squared error (RMSE): %.2f" % math.sqrt(mean_squared_error(Y_test, Y_pred)))
-# print("MLR R² score: %.2f" % r2_score(Y_test, Y_pred), end="\n")
-# print("MLR mean absolute error score:%.2f" % mean_absolute_error(Y_test, Y_pred))
+print("MLR Coefficients:", np.around(model.coef_, decimals = 3))
+print("MLR Intercept:", model.intercept_)
+print("MLR Root mean squared error (RMSE): %.2f" % math.sqrt(mean_squared_error(Y_test, Y_pred)))
+print("MLR R² score: %.2f" % r2_score(Y_test, Y_pred), end="\n")
 
 #Plot predictions 
 fig, axs = plt.subplots(2, 1)
@@ -113,36 +90,20 @@ rmses = []
 rmse_SD = []
 r2S = []
 r2_SD = []
-maes = []
-mae_SD = []
 def mlr_monte_carlo(X, Y):
     all_resid = []
     month_resid = []
     averages_arr = []
     rmse_arr = []
     R2_arr = []
-    mae_arr = []
     for i in range(10):
-        test_size = int(0.15 * len(my_df)) 
-        X_trainval, X_test = X[:-test_size], X[-test_size:]
-        Y_trainval, Y_test = Y[:-test_size], Y[-test_size:]
-        X_train, X_val, Y_train, Y_val = train_test_split(X_trainval, Y_trainval, test_size=0.176, random_state=42) # 0.176 x 0.85 = 0.15 for val
-        #randomized split
-        # X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=i)
-        scaler = StandardScaler()
-        X_train_scaled = scaler.fit_transform(X_train)   # fit on train only
-        X_val_scaled = scaler.transform(X_val)
-        X_test_scaled = scaler.transform(X_test)  
-        #make model 
+        X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=i)
         model = LinearRegression()
-        model.fit(X_train_scaled, Y_train)
-        # predict
-        Y_val_pred = model.predict(X_val_scaled)
-        Y_pred = model.predict(X_test_scaled)
+        model.fit(X_train, Y_train)
+        Y_pred = model.predict(X_test)
         # metrics
         rmse_arr.append(math.sqrt(mean_squared_error(Y_test, Y_pred))) #arr of each rmse in one monte carlo
         R2_arr.append(r2_score(Y_test, Y_pred))  
-        mae_arr.append(mean_absolute_error(Y_test, Y_pred))
         # residuals
         resid_arr = Y_test - Y_pred 
         all_resid.append(resid_arr)
@@ -161,52 +122,44 @@ def mlr_monte_carlo(X, Y):
     predictions["Simulations"] = np.arange(1, 11) 
     predictions["RMSE"] = np.around(rmse_arr, decimals = 3) #all rmses
     predictions["R^2"] = np.around(R2_arr, decimals = 2)    #all r^2s
-    predictions["MAE"] = np.around(mae_arr, decimals = 3)   #all maes
     print("MLR Average RMSE", predictions['RMSE'].mean())
     rmses.append(predictions['RMSE'].mean())
     rmse_SD.append(predictions['RMSE'].std())
     print("MLR Average R²", predictions['R^2'].mean())
     r2S.append(round(predictions['R^2'].mean(), 2))
     r2_SD.append(predictions['R^2'].std())
-    print("MLR Average MAE", predictions['MAE'].mean())
-    maes.append(predictions['MAE'].mean())
-    mae_SD.append(predictions['MAE'].std())
-
     return all_resid, monthly_average, monthly_std
 
 #comparison bar-plot of r^2 and rmse
 categories = ["Set A", "Set B", "Set C", "Set D"]
 colors = ["#F4A261", "#f6da43", "#46cdb4", "#285f94"]    
 if (my_df.equals(df_a)):
-    X_a = df_a.drop(columns = ['PP', 'day_of_year']) 
+    X_a = df_a[["day_of_year", "Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "TOC", "TON", "TOP", "BAC"]]
     Y_a = df_a['PP']
     all_resid, monthly_average, monthly_std = mlr_monte_carlo(X_a, Y_a)
 elif (my_df.equals(df_b)):
-    X_b = df_b.drop(columns = ['PP', 'day_of_year']) 
+    X_b = df_b[["day_of_year", "Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "BAC"]]
     Y_b = df_b['PP']
     all_resid, monthly_average, monthly_std = mlr_monte_carlo(X_b, Y_b)
 elif (my_df.equals(df_c)):
-    X_c = df_c.drop(columns = ['PP', 'day_of_year']) 
+    X_c = df_c[["day_of_year", "Depth", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "BAC"]]
     Y_c = df_c['PP']
     all_resid, monthly_average, monthly_std = mlr_monte_carlo(X_c, Y_c)
 elif (my_df.equals(df_d)):
-    X_d = df_d.drop(columns = ['PP', 'day_of_year']) 
+    X_d = df_d[["day_of_year", "Depth", "Temp", "O2", "NO3", "PO4"]]
     Y_d = df_d['PP']
     all_resid, monthly_average, monthly_std = mlr_monte_carlo(X_d, Y_d)
 
 # # R^2 and RMSE bar chart
-# fig, axs = plt.subplots(1, 3, figsize = (7, 5), sharey=False)
-# axs[0].bar(categories, r2S, color=colors)
-# axs[0].errorbar(categories, r2S, yerr=r2_SD, fmt="o", color="k", capsize=3)
+# fig, axs = plt.subplots(1, 2, figsize = (7, 5), sharey=False)
+# axs[0].bar(categories, R2S, color=colors)
+# axs[0].errorbar(categories, R2S, yerr=R2_SD, fmt="o", color="k", capsize=3)
 # axs[0].set_ylabel('Average R^2 Score')
 # axs[0].set_ylim(0, 0.75) 
-# axs[1].bar(categories, rmses, color=colors)
-# axs[1].errorbar(categories, rmses, yerr=rmse_SD, fmt="o", color="k", capsize=3)
+# axs[1].bar(categories, RMSES, color=colors)
+# axs[1].errorbar(categories, RMSES, yerr=RMSE_SD, fmt="o", color="k", capsize=3)
 # axs[1].set_ylabel('Average RMSE (mgC/m3/day)')
 # axs[1].set_ylim(0, 2.5)  
-# axs[2].bar(categories, rmses, color=colors)
-# axs[2].errorbar(categories, maes, yerr=mae_SD, fmt="o", color="k", capsize=3)
-# axs[2].set_ylabel('Average MAE (mgC/m3/day)')
 # # print('rmse array: ', RMSES)
 # # print('rmse standard deviations: ', RMSE_SD) 
 # plt.tight_layout()
