@@ -5,7 +5,7 @@ import math
 import matplotlib.pyplot as plt
 from sklearn.tree import export_graphviz
 import graphviz
-from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 from scipy.stats import norm
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.ensemble import RandomForestRegressor
@@ -21,23 +21,34 @@ df_d = pd.read_csv('C:/Users/elain/OneDrive/Documents/Research - BATS/df_sets/df
 my_df = df_c 
 
 # Random Forest Regression 
-X = my_df.drop(columns = ['PP', 'yymmdd'])  # drop PP bc were predicting, drop yymmdd bc it is datetime
+X = my_df.drop(columns = ['PP', 'day_of_year'])  # drop PP bc were predicting
 Y = my_df['PP'] 
-# split data
-X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=0) # split data
+#forecasting split
+test_size = int(0.15 * len(my_df)) 
+X_trainval, X_test = X[:-test_size], X[-test_size:]
+Y_trainval, Y_test = Y[:-test_size], Y[-test_size:]
+X_train, X_val, Y_train, Y_val = train_test_split(X_trainval, Y_trainval, test_size=0.176, random_state=42) # 0.176 x 0.85 = 0.15 for val
+# randomized split
+# X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=0) # split data
 # make model
 rfr = RandomForestRegressor(n_estimators=300, random_state=0, oob_score=True)
 rfr.fit(X_train, Y_train)
 # make predictions
+Y_val_pred = rfr.predict(X_val)
 Y_pred = rfr.predict(X_test)
 
 print('first tree depth: ', rfr.estimators_[0].get_depth(), 'first tree leaves: ', rfr.estimators_[0].get_n_leaves())
 print('last tree depth: ', rfr.estimators_[-1].get_depth(), 'last tree leaves: ', rfr.estimators_[-1].get_n_leaves())
 
-mse = round(mean_squared_error(Y_test, Y_pred), 4)
-print("RFR Root mean squared error (RMSE): %.2f" % math.sqrt(mean_squared_error(Y_test, Y_pred)))
-r2 = round(r2_score(Y_test, Y_pred), 4)
-print(f'RFR R-squared: {r2}')
+# model evaluation
+def evaluate(y_true, y_pred, name=""):
+    rmse = math.sqrt(mean_squared_error(y_true, y_pred))
+    r2 = r2_score(y_true, y_pred)
+    mae = mean_absolute_error(y_true, y_pred)
+    print(f"RFR {name} R²: {r2:.3f}, RMSE: {rmse:.3f}, MAE: {mae:.3f}")
+    return r2
+evaluate(Y_val, Y_val_pred, "Validation")
+evaluate(Y_test, Y_pred, "Test")
 feature_importances = rfr.feature_importances_
 feature_importances = [round(importance, 4) for importance in feature_importances]
 print(f'RFR Feature importances: {feature_importances}')
@@ -69,20 +80,31 @@ rmses = []
 rmse_SD = []
 r2S = []
 r2_SD = []
+maes = []
+mae_SD = []
 def rfr_monte_carlo(X, Y):
     all_resid = []
     month_resid = []
     averages_arr = []
     rmse_arr = []
     R2_arr = []
+    mae_arr = []
     for i in range(10):
-        X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=i) # split data
+        #forecasting split
+        test_size = int(0.15 * len(my_df)) 
+        X_trainval, X_test = X[:-test_size], X[-test_size:]
+        Y_trainval, Y_test = Y[:-test_size], Y[-test_size:]
+        X_train, X_val, Y_train, Y_val = train_test_split(X_trainval, Y_trainval, test_size=0.176, random_state=42) # 0.176 x 0.85 = 0.15 for val
+        # # randomized split
+        # X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=i) # split data
         rfr = RandomForestRegressor(n_estimators=500, random_state=i, oob_score=True)
         rfr.fit(X_train, Y_train)
+        Y_val_pred = rfr.predict(X_val)
         Y_pred = rfr.predict(X_test)
         #metrics
         rmse_arr.append(math.sqrt(mean_squared_error(Y_test, Y_pred))) #arr of each rmse in one monte carlo
         R2_arr.append(r2_score(Y_test, Y_pred))  
+        mae_arr.append(mean_absolute_error(Y_test, Y_pred))
         #residuals
         resid_arr = Y_test - Y_pred #residual array
         all_resid.append(resid_arr)
@@ -103,33 +125,40 @@ def rfr_monte_carlo(X, Y):
     predictions["Simulations"] = np.arange(1, 11) 
     predictions["RMSE"] = np.around(rmse_arr, decimals = 2)            #all rmses
     predictions["R^2"] = np.around(R2_arr, decimals = 2)               #all r^2s
+    predictions["MAE"] = np.around(mae_arr, decimals = 3)   #all maes
     print("Average RMSE", predictions['RMSE'].mean())
     rmses.append(predictions['RMSE'].mean())
     rmse_SD.append(predictions['RMSE'].std())
     print("Average R²", predictions['R^2'].mean())
     r2S.append(round(predictions['R^2'].mean(), 2))
     r2_SD.append(predictions['R^2'].std())
+    print("MLR Average MAE", predictions['MAE'].mean())
+    maes.append(predictions['MAE'].mean())
+    mae_SD.append(predictions['MAE'].std())
     return all_resid, monthly_average, monthly_std
 
 #comparison bar-plot of r^2 and rmse
 categories = ["Set A", "Set B", "Set C", "Set D"]
 colors = ["#F4A261", "#f6da43", "#46cdb4", "#285f94"]  
 if (my_df.equals(df_a)):
-    X_a = df_a.drop(columns = ['PP', 'yymmdd'])
+    X_a = df_a.drop(columns = ['PP', 'day_of_year'])
     Y_a = df_a['PP']
     all_resid, monthly_average, monthly_std = rfr_monte_carlo(X_a, Y_a)
 elif (my_df.equals(df_b)):
-    X_b = df_b.drop(columns = ['PP', 'yymmdd'])
+    X_b = df_b.drop(columns = ['PP', 'day_of_year'])
     Y_b = df_b['PP']
     all_resid, monthly_average, monthly_std = rfr_monte_carlo(X_b, Y_b)
 elif (my_df.equals(df_c)):
-    X_c = df_c.drop(columns = ['PP', 'yymmdd'])
+    X_c = df_c.drop(columns = ['PP', 'day_of_year'])
     Y_c = df_c['PP']
     all_resid, monthly_average, monthly_std = rfr_monte_carlo(X_c, Y_c)
 elif (my_df.equals(df_d)):
-    X_d = df_d.drop(columns = ['PP', 'yymmdd'])
+    X_d = df_d.drop(columns = ['PP', 'day_of_year'])
     Y_d = df_d['PP']
     all_resid, monthly_average, monthly_std = rfr_monte_carlo(X_d, Y_d)
+
+# print("monthly average:", monthly_average)
+# print("monthly std:", monthly_std)
 
 # # R^2 and RMSE bar chart
 # fig, axs = plt.subplots(1, 2, figsize = (7, 5), sharey=False)
