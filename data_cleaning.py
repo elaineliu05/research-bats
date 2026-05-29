@@ -6,7 +6,7 @@ import matplotlib.ticker as ticker
 import matplotlib.dates as mdates
 from scipy.stats import norm
 
-file_path = 'C:/Users/elain/OneDrive/Documents/Research - BATS/matched_data_from_BATS.xlsx'
+file_path = 'C:/Users/elain/OneDrive/Documents/Research - BATS/data/matched_data_from_BATS.xlsx'
 orig_df = pd.read_excel(file_path)
 #reformatting columns
 orig_df = orig_df.apply(pd.to_numeric, errors='coerce').astype('float64')
@@ -104,22 +104,6 @@ df_d = df_d.dropna()
 print("Num rows in set D:", len(df_d))
 print("Num unique dates in set D:", df_d['yymmdd'].nunique())
 
-
-# #plotting pp (original data) over time
-# split_date = datetime.datetime(2018, 4, 26)  # the train/test split date
-# fig, ax = plt.subplots(figsize=(10, 5))
-# scatter = ax.scatter(df['yymmdd'], df['PP'], c=df['Depth'], cmap = 'viridis', s=3, linewidths=0.1)
-# ax.axvline(split_date, color='red', linestyle='--', linewidth=1, label='Train/Test Split')
-# ax.set_xlabel("Date"), ax.set_ylabel("PP (mgC/m³/day)")
-# ax.xaxis.set_major_locator(ticker.MaxNLocator(10))
-# ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
-# ax.set_title("Primary Productivity (PP) over Time")
-# cbar = plt.colorbar(scatter, ax=ax)
-# cbar.set_label("Depth (m)")
-# cbar.ax.invert_yaxis()
-# plt.tight_layout()
-# plt.show()
-
 # applying chauvenet to all dfs
 # start at column 7 (Depth) to avoid date columns
 for i in range(7, df_a.shape[1]): df_a = chauvenets_criterion(df_a, df_a.columns[i])
@@ -133,78 +117,10 @@ print("Num rows in set D after removing outliers:", len(df_d))
 for i in range(15, df.shape[1]): df = chauvenets_criterion(df, df.columns[i])
 print("Num rows in dataframe after removing outliers:", len(df_d))
 # exporting dataframes
-df_a.to_csv('df_a.csv', index=False) 
-df_b.to_csv('df_b.csv', index=False) 
-df_c.to_csv('df_c.csv', index=False) 
-df_d.to_csv('df_d.csv', index=False) 
-
-
-# # linear regression subplots of each variable against PP
-# from scipy import stats
-# # arr_names = ["sin_doy", "cos_doy", "Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "TOC", "TON", "TOP", "BAC", "PP"]
-# # arr_units =  ["", "", " (m)", " (mg/m3)", " (C)", " (PSS-78)", " (umol/kg)"," (umol/kg)", " (umol/kg)", " (ug/kg)", " (ug/kg)", " (umol/kg)", " (umol/kg)", " (umol/kg)", " (nmol/kg)", " (cells*10^8/kg)", " (mgC/m³/day)"]
-# arr_names = ["sin_doy", "cos_doy", "Depth", "Chl", "Temp", "O2", "NO3", "PO4", "PP"]
-# arr_units =  ["", "", " (m)", " (mg/m3)", " (C)", " (umol/kg)"," (umol/kg)", " (umol/kg)", " (mgC/m³/day)"]
-# names_units = [arr_names_pp + arr_units for arr_names_pp, arr_units in zip(arr_names, arr_units)]
-# # linear regression subplots of each variable against PP
-# def round_sig(x, sig=2):
-#     return round(x, sig - int(f"{x:.1e}".split("e")[1]))
-# fig, axs = plt.subplots(4, 4, figsize=(12, 7))
-# axs = axs.ravel()
-# arr_slopes = []
-# for i in range(len(arr_names) - 1):
-#     x= df_a[arr_names[i]]
-#     axs[i].scatter(x, df_a['PP'], s=5, linewidths=1)
-#     axs[i].set_xlabel(names_units[i]), axs[i].set_ylabel('PP (mgC/m³/day)') 
-#     axs[i].set_xlim(x.min(), x.max()), axs[i].set_ylim(-0.1)
-#     m, b, r_value, p_value, std_err = stats.linregress(x, df_a["PP"])
-#     arr_slopes.append(m)
-#     alpha = 0.05  # 95% confidence interval
-#     t = stats.t.ppf(1 - alpha / 2, len(x) - 2)
-#     slope_ci_low = m - t * std_err
-#     slope_ci_high = m + t * std_err
-#     r_sqrd = r_value**2
-#     x_extended = np.linspace(x.min(), x.max(), 500)
-#     axs[i].axline(xy1=(0, b), slope=m, linestyle="--", linewidth="1", color="r", label=f'$y = {round_sig(m, sig=2)}x {round_sig(b, sig=2):+}$\n$r^2 = {round_sig(r_sqrd, sig=2)}$')
-#     axs[i].fill_between(x_extended, slope_ci_low*x_extended + b, slope_ci_high*x_extended + b, color='red', alpha=0.3)
-#     axs[i].legend()
-# plt.tight_layout()
-# plt.show()
-
-
-
-# from scipy import stats
-# from matplotlib.colors import LinearSegmentedColormap
-# # Multicollinearity
-# df_cut = df_a[["Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "TOC", "TON", "TOP", "BAC"]]
-# df_matrix = df_cut.corr(method = 'pearson').round(2)
-# colors = ["navy", "aliceblue", "navy"]
-# custom_cmap = LinearSegmentedColormap.from_list("custom_cmap", colors)
-# sns.heatmap(df_matrix, annot=True, cmap=custom_cmap, linewidths=0.1, cbar_kws={'label': 'Correlation Coefficient'}, center = 0, vmin=-1, vmax=1)
-# plt.show()
-# sns.pairplot(df_c[["Depth", "Chl", "Temp", "O2", "NO3", "PO4", "POC", "PON", "BAC"]], plot_kws={"s": 5})
-# plt.show()
-
-# #contour plot
-# main_depths = [1, 20, 40, 60, 80, 100, 120, 140] #adjust depth values
-# def adjust_depth(value):
-#     for main_depth in main_depths:
-#         if abs(value - main_depth) <= 10:
-#             return main_depth 
-#     return value 
-# df['Adjusted_Depth'] = df['Depth'].apply(adjust_depth)
-# df_nodup = df.drop_duplicates(subset=['yymmdd', 'Adjusted_Depth'], keep='first') #drop duplicates
-# df_pivot = df_nodup.pivot(index='Adjusted_Depth', columns='yymmdd', values='PP').fillna(0) #pivot
-# X, Y = np.meshgrid(df_pivot.columns, df_pivot.index)
-# Z = df_pivot.values  
-# plt.figure(figsize=(10, 6))
-# contour = plt.contourf(X, Y, Z, cmap='viridis', levels=15)
-# plt.colorbar(contour, label="Primary Productivity (mgC/m³/day)")
-# plt.gca().invert_yaxis()  
-# plt.xlabel("Date")
-# plt.ylabel("Depth (m)")
-# plt.title("Time Series Contour Plot of Primary Productivity")
-# plt.show()
+df_a.to_csv('df_sets/df_a.csv', index=False) 
+df_b.to_csv('df_sets/df_b.csv', index=False) 
+df_c.to_csv('df_sets/df_c.csv', index=False) 
+df_d.to_csv('df_sets/df_d.csv', index=False) 
 
 # PAPER FIG 2
 # surface vs deep - plotting pp 
@@ -238,84 +154,66 @@ axs[1].text(-0.08, 1.05, '(b)', transform=axs[1].transAxes, fontsize=14)
 plt.tight_layout()
 plt.show()
 
-# # TRAIN VS TEST
-# # plotting pp over doy
-# fig, axs = plt.subplots(2, 1, figsize=(10, 7))
-# sc = axs[0].scatter(df_d['day_of_year'], df_d['PP'], c=df_d['Depth'], cmap = 'viridis', s=3, linewidths=0.1)
-# axs[0].set_xlabel("Day of Year"), axs[0].set_ylabel("PP (mgC/m³/day)")
-# cbar = plt.colorbar(sc, ax=axs[0])
+# PAPER FIG Supporting Info S1 --------------------------------
+# #plotting pp (original data) over time
+# split_date = datetime.datetime(2018, 4, 26)  # the train/test split date
+# fig, ax = plt.subplots(figsize=(10, 5))
+# scatter = ax.scatter(df['yymmdd'], df['PP'], c=df['Depth'], cmap = 'viridis', s=3, linewidths=0.1)
+# ax.axvline(split_date, color='red', linestyle='--', linewidth=1, label='Train/Test Split')
+# ax.set_xlabel("Date"), ax.set_ylabel("PP (mgC/m³/day)")
+# ax.xaxis.set_major_locator(ticker.MaxNLocator(10))
+# ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
+# ax.set_title("Primary Productivity (PP) over Time")
+# cbar = plt.colorbar(scatter, ax=ax)
 # cbar.set_label("Depth (m)")
 # cbar.ax.invert_yaxis()
-# # plot monthly average of pp over doy with standard deviation error bars
-# train_test_split_date = datetime.datetime(2018, 4, 26)
-# # df_surface = df_d[df_d['set_depths'] == 1]
-# df_train = df_d[df_d['yymmdd'] < train_test_split_date]
-# df_test = df_d[df_d['yymmdd'] >= train_test_split_date]
-# df_train['month'] = df_train['yymmdd'].dt.month
-# df_test['month'] = df_test['yymmdd'].dt.month
-# train_monthly_avg = df_train.groupby('month')['PP'].mean()
-# test_monthly_avg = df_test.groupby('month')['PP'].mean()
-# train_monthly_std = df_train.groupby('month')['PP'].std()
-# test_monthly_std = df_test.groupby('month')['PP'].std()
-
-# axs[1].plot(train_monthly_avg.index, train_monthly_avg.values, marker='o', color = 'orange')
-# axs[1].errorbar(train_monthly_avg.index, train_monthly_avg.values, yerr=train_monthly_std.values, fmt='o', color='orange', capsize=5)
-# axs[1].plot(test_monthly_avg.index, test_monthly_avg.values, marker='o', color = "blueviolet")
-# axs[1].errorbar(test_monthly_avg.index, test_monthly_avg.values, yerr=test_monthly_std.values, fmt='o', color='blueviolet', capsize=5)
-# axs[1].set_xlabel("Month"), axs[1].set_ylabel("Average PP (mgC/m³/day)")
-# axs[1].set_xticks(range(1, 13))
-# #legend for second plot
-# axs[1].legend(["Train", "Test"], loc="upper right")
-# # Panel labels
-# axs[0].text(-0.08, 1.05, '(a)', transform=axs[0].transAxes, fontsize=14)
-# axs[1].text(-0.08, 1.05, '(b)', transform=axs[1].transAxes, fontsize=14)
 # plt.tight_layout()
 # plt.show()
 
+# PAPER FIG Supporting Info S2 ------------------------------------------------------------------
+# multicollinearity plot
+# from scipy import stats
+# from matplotlib.colors import LinearSegmentedColormap
+# # Multicollinearity
+# df_cut = df_a[["Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "TOC", "TON", "TOP", "BAC"]]
+# df_matrix = df_cut.corr(method = 'pearson').round(2)
+# colors = ["navy", "aliceblue", "navy"]
+# custom_cmap = LinearSegmentedColormap.from_list("custom_cmap", colors)
+# sns.heatmap(df_matrix, annot=True, cmap=custom_cmap, linewidths=0.1, cbar_kws={'label': 'Correlation Coefficient'}, center = 0, vmin=-1, vmax=1)
+# plt.show()
+# sns.pairplot(df_c[["Depth", "Chl", "Temp", "O2", "NO3", "PO4", "POC", "PON", "BAC"]], plot_kws={"s": 5})
+# plt.show()
 
+# PAPER FIG Supporting Info S3 ------------------------------------------------------------------
 
-
-# # residuals and pp over depth = 1 and depth = 100
-# fig, axs = plt.subplots(2, 1, figsize=(10, 7))
-# # plot monthly average of pp over doy with standard deviation error bars
-# train_test_split_date = datetime.datetime(2018, 4, 26)
-# # df_surface = df_d[df_d['set_depths'] == 1]
-# df_train = df_d[df_d['yymmdd'] < train_test_split_date]
-# df_test = df_d[df_d['yymmdd'] >= train_test_split_date]
-# df_train['month'] = df_train['yymmdd'].dt.month
-# df_test['month'] = df_test['yymmdd'].dt.month
-# # train with surface and deep monthly averages and stds
-# df_train_surface = df_train[df_train['set_depths'] == 1]
-# df_train_deep = df_train[df_train['set_depths'] == 100]
-# # test w surface and deep
-# df_test_surface = df_test[df_test['set_depths'] == 1]
-# df_test_deep = df_test[df_test['set_depths'] == 100]
-
-# train_surface_monthly_avg = df_train_surface.groupby('month')['PP'].mean()
-# train_deep_monthly_avg = df_train_deep.groupby('month')['PP'].mean()
-# test_surface_monthly_avg = df_test_surface.groupby('month')['PP'].mean()
-# test_deep_monthly_avg = df_test_deep.groupby('month')['PP'].mean()
-# train_surface_monthly_std = df_train_surface.groupby('month')['PP'].std()
-# train_deep_monthly_std = df_train_deep.groupby('month')['PP'].std()
-# test_surface_monthly_std = df_test_surface.groupby('month')['PP'].std()
-# test_deep_monthly_std = df_test_deep.groupby('month')['PP'].std()
-
-# axs[0].plot(train_surface_monthly_avg.index, train_surface_monthly_avg.values, marker='o', color = 'orange')
-# axs[0].errorbar(train_surface_monthly_avg.index, train_surface_monthly_avg.values, yerr=train_surface_monthly_std.values, fmt='o', color='orange', capsize=5)
-# axs[1].plot(train_deep_monthly_avg.index, train_deep_monthly_avg.values, marker='o', color = 'orange')
-# axs[1].errorbar(train_deep_monthly_avg.index, train_deep_monthly_avg.values, yerr=train_deep_monthly_std.values, fmt='o', color='orange', capsize=5)
-
-# axs[0].plot(test_surface_monthly_avg.index, test_surface_monthly_avg.values, marker='o', color = "blueviolet")
-# axs[0].errorbar(test_surface_monthly_avg.index, test_surface_monthly_avg.values, yerr=test_surface_monthly_std.values, fmt='o', color='blueviolet', capsize=5)
-# axs[0].set_xlabel("Month"), axs[0].set_ylabel("Average PP (mgC/m³/day)")
-# axs[1].plot(test_deep_monthly_avg.index, test_deep_monthly_avg.values, marker='o', color = "blueviolet")
-# axs[1].errorbar(test_deep_monthly_avg.index, test_deep_monthly_avg.values, yerr=test_deep_monthly_std.values, fmt='o', color='blueviolet', capsize=5)
-# axs[1].set_xlabel("Month"), axs[1].set_ylabel("Average PP (mgC/m³/day)")
-# axs[1].set_xticks(range(1, 13))
-# #legend for second plot
-# axs[1].legend(["Train", "Test"], loc="upper right")
-# # Panel labels
-# axs[0].text(-0.08, 1.05, '(a)', transform=axs[0].transAxes, fontsize=14)
-# axs[1].text(-0.08, 1.05, '(b)', transform=axs[1].transAxes, fontsize=14)
+# # linear regression subplots of each variable against PP
+# from scipy import stats
+# # arr_names = ["sin_doy", "cos_doy", "Depth", "Chl", "Temp", "Sal", "O2", "NO3", "PO4", "POC", "PON", "POP", "TOC", "TON", "TOP", "BAC", "PP"]
+# # arr_units =  ["", "", " (m)", " (mg/m3)", " (C)", " (PSS-78)", " (umol/kg)"," (umol/kg)", " (umol/kg)", " (ug/kg)", " (ug/kg)", " (umol/kg)", " (umol/kg)", " (umol/kg)", " (nmol/kg)", " (cells*10^8/kg)", " (mgC/m³/day)"]
+# arr_names = ["sin_doy", "cos_doy", "Depth", "Chl", "Temp", "O2", "NO3", "PO4", "PP"]
+# arr_units =  ["", "", " (m)", " (mg/m3)", " (C)", " (umol/kg)"," (umol/kg)", " (umol/kg)", " (mgC/m³/day)"]
+# names_units = [arr_names_pp + arr_units for arr_names_pp, arr_units in zip(arr_names, arr_units)]
+# # linear regression subplots of each variable against PP
+# def round_sig(x, sig=2):
+#     return round(x, sig - int(f"{x:.1e}".split("e")[1]))
+# fig, axs = plt.subplots(4, 4, figsize=(12, 7))
+# axs = axs.ravel()
+# arr_slopes = []
+# for i in range(len(arr_names) - 1):
+#     x= df_a[arr_names[i]]
+#     axs[i].scatter(x, df_a['PP'], s=5, linewidths=1)
+#     axs[i].set_xlabel(names_units[i]), axs[i].set_ylabel('PP (mgC/m³/day)') 
+#     axs[i].set_xlim(x.min(), x.max()), axs[i].set_ylim(-0.1)
+#     m, b, r_value, p_value, std_err = stats.linregress(x, df_a["PP"])
+#     arr_slopes.append(m)
+#     alpha = 0.05  # 95% confidence interval
+#     t = stats.t.ppf(1 - alpha / 2, len(x) - 2)
+#     slope_ci_low = m - t * std_err
+#     slope_ci_high = m + t * std_err
+#     r_sqrd = r_value**2
+#     x_extended = np.linspace(x.min(), x.max(), 500)
+#     axs[i].axline(xy1=(0, b), slope=m, linestyle="--", linewidth="1", color="r", label=f'$y = {round_sig(m, sig=2)}x {round_sig(b, sig=2):+}$\n$r^2 = {round_sig(r_sqrd, sig=2)}$')
+#     axs[i].fill_between(x_extended, slope_ci_low*x_extended + b, slope_ci_high*x_extended + b, color='red', alpha=0.3)
+#     axs[i].legend()
 # plt.tight_layout()
 # plt.show()
