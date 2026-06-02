@@ -5,7 +5,11 @@ Primary productivity is an essential indicator of marine ecosystem health and oc
 
 
 
-## To activate environment:
+## To set up repository:
+
+Clone repo to local 
+
+To set up environment: 
 
 conda env create -f environment.yml
 
