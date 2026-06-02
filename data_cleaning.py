@@ -6,7 +6,7 @@ import matplotlib.ticker as ticker
 import matplotlib.dates as mdates
 from scipy.stats import norm
 
-file_path = 'C:/Users/elain/OneDrive/Documents/Research - BATS/data/matched_data_from_BATS.xlsx'
+file_path = 'C:/Users/elain/OneDrive/Documents/Research - BATS/merged_data/matched_data_from_BATS.xlsx'
 orig_df = pd.read_excel(file_path)
 #reformatting columns
 orig_df = orig_df.apply(pd.to_numeric, errors='coerce').astype('float64')
