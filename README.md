@@ -8,4 +8,5 @@ Primary productivity is an essential indicator of marine ecosystem health and oc
 ## To activate environment:
 
 conda env create -f environment.yml
+
 conda activate bats
