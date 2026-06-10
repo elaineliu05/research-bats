@@ -216,44 +216,8 @@ plt.savefig("feat_importance_mlr_rfr_xgb.png", dpi=300)
 plt.show()
 
 # PAPER FIG 6 ------------------------------------------------------------------------------------------------------------------------------
-#comparison monthly sum of errors line plot, residuals vs train/test data
-fig, axs = plt.subplots(2, 1, figsize=(10, 8))
-axs[0].errorbar(mlr_monthly_avg.index, mlr_monthly_avg.values.flatten(), yerr=mlr_monthly_std.values.flatten(), fmt='o-', color='salmon', ecolor='#f7a89a', capsize=4, label='MLR')
-axs[0].errorbar(rfr_monthly_avg.index, rfr_monthly_avg.values.flatten(), yerr=rfr_monthly_std.values.flatten(), fmt='o-', color='gold', ecolor='#fae97a', capsize=4, label='RFR')
-axs[0].errorbar(xgb_monthly_avg.index, xgb_monthly_avg.values.flatten(), yerr=xgb_monthly_std.values.flatten(), fmt='o-', color='yellowgreen', ecolor='#c9e675', capsize=4, label='XGB')
-axs[0].errorbar(lstm_monthly_avg.index, lstm_monthly_avg.values.flatten(), yerr=lstm_monthly_std.values.flatten(), fmt='o-', color='royalblue', ecolor='cornflowerblue', capsize=4, label='LSTM')
-axs[0].set_xlabel('Month')
-axs[0].set_ylabel('Average Residuals (mgC/m³/day)')
-axs[0].set_ylim(-4, 10)
-axs[0].set_xticks(range(1, 13))
-axs[0].legend(loc="upper right")
-# plot monthly average of pp over doy with standard deviation error bars
 train_test_split_date = datetime.datetime(2018, 4, 26)
-df_train = df_d[df_d['yymmdd'] < train_test_split_date]
-df_test = df_d[df_d['yymmdd'] >= train_test_split_date]
-df_train['month'] = df_train['yymmdd'].dt.month
-df_test['month'] = df_test['yymmdd'].dt.month
-train_monthly_avg = df_train.groupby('month')['PP'].mean()
-test_monthly_avg = df_test.groupby('month')['PP'].mean()
-train_monthly_std = df_train.groupby('month')['PP'].std()
-test_monthly_std = df_test.groupby('month')['PP'].std()
-axs[1].plot(train_monthly_avg.index, train_monthly_avg.values, marker='o', color = 'orange')
-axs[1].errorbar(train_monthly_avg.index, train_monthly_avg.values, yerr=train_monthly_std.values, fmt='o', color='orange', capsize=5)
-axs[1].plot(test_monthly_avg.index, test_monthly_avg.values, marker='o', color = "blueviolet")
-axs[1].errorbar(test_monthly_avg.index, test_monthly_avg.values, yerr=test_monthly_std.values, fmt='o', color='blueviolet', capsize=5)
-axs[1].set_xlabel("Month"), axs[1].set_ylabel("Average Primary Productivity (mgC/m³/day)")
-axs[1].set_xticks(range(1, 13))
-axs[1].set_ylim(-4, 10)
-#legend for second plot
-axs[1].legend(["Train", "Test"], loc="upper right")
-# Panel labels
-axs[0].text(-0.08, 1.05, '(a)', transform=axs[0].transAxes, fontsize=14)
-axs[1].text(-0.08, 1.05, '(b)', transform=axs[1].transAxes, fontsize=14)
-plt.tight_layout()
-plt.show()
-
-# PAPER FIG Supporting Info S5 ----------------------------------------------------------------------
-# calculating pp data over surface and subsurface 
+# CALCULATING PP DATA OVER SURFACE AND SUBSURFACE
 # train and test over depth = 1 and depth = 100
 df_train = df_d[df_d['yymmdd'] < train_test_split_date]
 df_test = df_d[df_d['yymmdd'] >= train_test_split_date]
@@ -307,11 +271,12 @@ depth100_df = all_df[all_df['set_depths'] == 100]
 depth1_monthly = depth1_df.groupby('month')[['MLR_resid','XGB_resid','LSTM_resid','RFR_resid']].mean()
 depth100_monthly = depth100_df.groupby('month')[['MLR_resid','XGB_resid','LSTM_resid','RFR_resid']].mean()
 
+# PAPER FIG S6
 fig, axes = plt.subplots(nrows = 2, ncols = 2, figsize=(10, 10), sharex=True)
 # top left
 for col, color in zip(depth1_monthly.columns, colors):
     axes[0, 0].plot(depth1_monthly.index, depth1_monthly[col], marker='o', label=col, color=color)
-axes[0, 0].set_title("Surface (Depth = 1)")
+axes[0, 0].set_title("Surface (Depth = 0)")
 axes[0, 0].set_ylabel("Residual (True - Predicted)")
 axes[0, 0].axhline(y=0, color='grey', linestyle='--')
 axes[0, 0].set_ylim(-3.5, 13)
