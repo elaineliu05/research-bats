@@ -116,6 +116,26 @@ for name, my_df in datasets.items():
 
     # dataframe w predictions
     avg_test_pred = np.mean(test_preds, axis=0)
+
+    # DEPTH SEPARATED METRICS ---------------------------------------------------------
+    depth_eval = pd.DataFrame({
+        "Depth": my_df.loc[y_test.index, "set_depths"],
+        "True_PP": y_test.values,
+        "Pred_PP": avg_test_pred
+    })
+    for depth in [1, 100]:
+        depth_df = depth_eval[depth_eval["Depth"] == depth]
+        if len(depth_df) > 0:
+            rmse_depth = np.sqrt(mean_squared_error(depth_df["True_PP"], depth_df["Pred_PP"]))
+            r2_depth = r2_score(depth_df["True_PP"], depth_df["Pred_PP"])
+            mae_depth = mean_absolute_error(depth_df["True_PP"],depth_df["Pred_PP"])
+            print(f"\nDepth = {depth}")
+            print(f"n = {len(depth_df)}")
+            print(f"RMSE = {rmse_depth:.3f}")
+            print(f"R²   = {r2_depth:.3f}")
+            print(f"MAE  = {mae_depth:.3f}")
+    #-----------------------------------------------------------------
+
     rfr_df_pred = my_df[['yymmdd', 'year', 'month', 'day', 'set_depths', 'PP']]
     rfr_df_pred.loc[y_test.index, "RFR_Pred_PP"] = avg_test_pred
     rfr_df_pred.to_csv('preds/rfr_dfd_pred.csv', index=False) 

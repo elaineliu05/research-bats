@@ -94,6 +94,28 @@ for name, my_df in datasets.items():
     # dataframe w predictions
     print(test_preds)
     avg_test_pred = np.mean(test_preds, axis=0)
+
+    # depth separated metrics --------------------------------------------------------
+    depth_eval = pd.DataFrame({
+        "Depth": my_df.loc[Y_test.index, "set_depths"],
+        "True_PP": Y_test.values,
+        "Pred_PP": avg_test_pred
+    })
+    depth_eval.to_csv('mlr_depth_eval.csv', index=False)
+    for depth in [1, 100]:
+        depth_df = depth_eval[depth_eval["Depth"] == depth]
+        if len(depth_df) > 0:
+            rmse_depth = np.sqrt(mean_squared_error(depth_df["True_PP"], depth_df["Pred_PP"]))
+            r2_depth = r2_score(depth_df["True_PP"], depth_df["Pred_PP"])
+            mae_depth = mean_absolute_error(depth_df["True_PP"],depth_df["Pred_PP"])
+
+            print(f"\nDepth = {depth}")
+            print(f"n = {len(depth_df)}")
+            print(f"RMSE = {rmse_depth:.3f}")
+            print(f"R²   = {r2_depth:.3f}")
+            print(f"MAE  = {mae_depth:.3f}")
+    #-----------------------------------------------------------------------------------------
+
     mlr_df_pred = my_df[['yymmdd', 'year', 'month', 'day', 'set_depths', 'PP']]
     mlr_df_pred.loc[Y_test.index, "MLR_Pred_PP"] = avg_test_pred
     mlr_df_pred.to_csv('preds/mlr_dfd_pred.csv', index=False) 
